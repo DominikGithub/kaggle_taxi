@@ -45,39 +45,38 @@ def weather_correlation():
     print pearR.shape
     visualize_correlation(pearR, 'corr')
 
-def smooth_weather(data):
+def smooth_weather():
+    data = load(st.eval_dir+'weather.bin')
     fig, axarr = plt.subplots(21, 3, figsize=(20, 30))
 
-
-    for day in range(21):
-        smoothed = np.ndarray((3, 144))
+    smoothed = np.ndarray((st.n_train_days, 3, 144))
+    for day in range(st.n_train_days):
         for objective in range(0, 3):
-            S = pd.Series(data[day,:,objective])
+            S = pd.Series(data[day, :, objective])
             outlier_idx = S[S.pct_change() == np.inf].index.values-1
             outlier = S.copy()
             outlier[outlier_idx] = np.nan
             outlier = outlier.interpolate(method='pchip')
 
             df = pd.DataFrame(outlier)
-            smoothed[objective,:] = df.rolling(window=4, center=True).median().values.flatten()
+            smoothed[day, objective, :] = df.rolling(window=4, center=True).median().values.flatten()
 
         axarr[day, 0].set_xticks(xrange(0, 144, 11))
-        axarr[day, 0].plot(smoothed[0], color='green')
+        axarr[day, 0].plot(smoothed[day, 0], color='green')
         axarr[day, 1].set_xticks(xrange(0, 144, 11))
-        axarr[day, 1].plot(smoothed[1], color='red')
+        axarr[day, 1].plot(smoothed[day, 1], color='red')
         axarr[day, 2].set_xticks(xrange(0, 144, 11))
-        axarr[day, 2].plot(smoothed[2])
+        axarr[day, 2].plot(smoothed[day, 2], color='blue')
 
+    save(st.eval_dir+'weather', smoothed)
 
-    fig.suptitle(labels[objective], fontsize=20)
+    fig.suptitle('Weather, Temp, PM25', fontsize=20)
     plt.savefig('smoothed.png')
     plt.close()
 
 
 if __name__ == "__main__":
     # weather_correlation()
-
-    data = load(st.eval_dir + 'weather.bin')
-    smooth_weather(data)
+    smooth_weather()
 
     # visualize_weather(data, 'Weather', '(Weather, Temp, PM25)')

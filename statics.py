@@ -41,5 +41,6 @@ order_keys = [order_id, driver_id, passenger_id, start_district_hash, dest_distr
 traffic_keys = [tj_district_hash, tj_level, time]
 weather_keys = [time, w_weather, w_temperature, w_pm25]
 
-n_poi_first = 30
-n_poi_second = 1000000
+n_poi_first = 26
+n_poi_second = 50
+# n_poi_third = 1000

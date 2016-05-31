@@ -62,7 +62,7 @@ def smooth_weather():
             outlier = outlier.interpolate(method='pchip')
 
             df = pd.DataFrame(outlier)
-            smoothed[day, objective, :] = df.rolling(window=4, center=True).median().values.flatten()
+            smoothed[day, objective, :] = df.rolling(window=4, center=True).median().fillna(0).values.flatten()
 
         axarr[day, 0].set_xticks(xrange(0, 144, 11))
         axarr[day, 0].plot(smoothed[day, 0], color='green')
@@ -86,18 +86,9 @@ def smooth_weather_test():
     smoothed = np.ndarray((n_days, 3, 144))
     for day in range(n_days):
         for objective in range(0, 3):
-            # S = pd.Series(data[day, :, objective])
-            # outlier_idx = S[S.pct_change() == np.inf].index.values-1
-            # outlier = S[~(S==0)].copy()
-            # print outlier.index.values
-
-            # outlier[outlier_idx] = np.nan
-            # outlier = outlier.interpolate(method='pchip')
-
             smoothed[day, objective, :] = pd.rolling_max(data[day, :, objective], window=13, center=True)
-
-            # df = pd.DataFrame(smoothed[day, objective, :])
-            # smoothed[day, objective, :] = df.rolling(window=4, center=True).median().values.flatten()
+            smoothed[day, objective, :] = pd.DataFrame(smoothed[day, objective, :]).fillna(0).values.flatten()
+            # smoothed[day, objective, :] = df.rolling(window=4, center=True).median().fillna(0).values.flatten()     # clean nan's after median!!!
 
         axarr[day, 0].set_xticks(xrange(0, 144, 11))
         axarr[day, 0].plot(smoothed[day, 0], color='green')
@@ -116,6 +107,6 @@ if __name__ == "__main__":
     # name = 'weather.bin'
     # weather_correlation(st.eval_dir+name)
     smooth_weather()
-    smooth_weather_test()
+    # smooth_weather_test()
 
     # visualize_weather(data, 'Weather', '(Weather, Temp, PM25)')

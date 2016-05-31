@@ -27,10 +27,17 @@ def visualize(data, title, normalize=False):
 def visualize_pois(data, title):
     print 'plotting %s' % title
 
-    plt.imshow(data.transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, st.n_poi_first])
-    plt.colorbar()
-    plt.suptitle(title)
+    fig = plt.figure(figsize=(40, 60))
+    cols = st.n_poi_first // 2
+    for fst in range(st.n_poi_first):
+        for col in range(cols):
+            ax2 = plt.subplot2grid((st.n_poi_first, cols), (fst, col))
+            ax2.imshow(data[:,fst,:].transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, st.n_poi_second])
+            ax2.get_xaxis().set_visible(False)
+            ax2.get_yaxis().set_visible(False)
 
+    plt.suptitle(title, fontsize=24)
+    plt.tight_layout()
     plt.savefig(st.eval_dir+title+'.png')
     plt.close()
 
@@ -65,7 +72,6 @@ def visualize_traffic(data, title, normalize=False):
     fig = plt.figure(figsize=(30, 20))
     idx = 0
     for day in range(7):
-        # plt.title(day)
         for lvl in range(st.max_congestion_lvls):
             ax2 = plt.subplot2grid((7, st.max_congestion_lvls), (day, lvl))
             if normalize:   dat = norm(data[:,:,idx])
@@ -112,7 +118,6 @@ def visualize_weather(data, name, title):
     fig.suptitle(name+' '+title, fontsize=20)
     plt.tight_layout()
     plt.savefig(st.eval_dir+name+'.png')
-    plt.show()
     plt.close()
 
 def hist(data, title, y_range=None):

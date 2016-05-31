@@ -7,10 +7,11 @@ import theano
 from sklearn import linear_model
 import math
 from mlp import mlp_train
-from data_container import IncMap, create_distr_Map
+from data_container import HashMap, IncMap, create_distr_Map
 from utils_file import merge_files, load, save, load_csv, load_test_data, save_predictions
 from utils_image import *
 from utils_data import norm, toUTCtimestamp, get_timeslot
+from correlation_smoothing import smooth_weather, smooth_weather_test
 
 logging.basicConfig(filename='taxi.log', level=logging.INFO)
 
@@ -121,19 +122,24 @@ def preprocess_weather(date):
             w_pm25 = w_dict[st.w_pm25]
             w_weather = w_dict[st.w_weather]
 
-            print day_idx
             weather_mat[day_idx-1][tslot_idx] = [w_weather, w_temp, w_pm25]
-            # weather_mat[week_day][tslot_idx][0] = time.mktime(datetime.datetime.strptime(w_dict[st.time], '%Y-%m-%d %H:%M:%S').timetuple())
-            # weather_mat[week_day][tslot_idx][0] = w_weather
-            # weather_mat[week_day][tslot_idx][1] = w_temp
-            # weather_mat[week_day][tslot_idx][2] = w_pm25
 
     save(st.eval_dir+'weather', weather_mat)
+    smooth_weather()
+    smooth_weather_test()
+
+def recursive(ndarray, keys, value, lvl):
+    if len(keys) > 1:
+        ndarray[keys[0]] = recursive(ndarray[keys[0]], keys[1:], value, lvl+1)
+        return ndarray
+    ndarray[keys] = value
+    return ndarray
 
 def preprocess_pois():
     print 'preprocessing pois'
     dist_map = create_distr_Map()
-    poi_map = np.zeros(shape=(int(st.n_districts), int(st.n_poi_first)))
+    poi_map = np.zeros(shape=(st.n_districts, st.n_poi_first, st.n_poi_second))
+    # poi_map = np.zeros(shape=(int(st.n_districts), int(st.n_poi_first)))
     pois = merge_files(glob.glob(st.data_dir+'poi_data'))
     for entry in pois:
         distr_hash = entry[0]
@@ -141,14 +147,18 @@ def preprocess_pois():
 
         for p in entry[1:]:
             try:
-                p.index('#')
-                num, classes = p.split('#')
+                p.index(':')
+                classes, num = p.split(':')
             except:
                 num = 1
                 classes = p
 
-            pfirst, psecond = classes.split(':')
-            poi_map[distr_idx][int(pfirst)-1] += int(num)
+            classes = [int(x) for x in classes.split('#')]
+            try:
+                keys = [distr_idx]+classes
+                recursive(poi_map, keys, int(num), 0)
+            except:
+                raise Exception('More than 2 class levels found: %s %s' % len(classes, p))
 
     save(st.eval_dir+'pois', norm(poi_map))
 
@@ -158,20 +168,20 @@ def visualizations(interpolate_missing=False):
     # visualize_orders(load(st.eval_dir+'gap.bin'), 'Gap', normalize=True)
     # hist(load(st.eval_dir+'start_dist.bin'), 'Start_dist', y_range=[70, 180000])
     # hist(load(st.eval_dir+'dest_dist.bin'), 'Dest_dist', y_range=[70, 120000])
-    #
+
     # if interpolate_missing:
     #     traffic_data = interpolate_traffic(53)
     #     visualize_traffic(traffic_data, 'Traffic', normalize=True)
     # else:
     #     visualize_traffic(load(st.eval_dir + 'traffic.bin'), 'Traffic', normalize=True)
 
-    visualize_weather(load(st.eval_dir + 'weather.bin'), 'Weather', '(Weather, Temp, PM25)')
-    # visualize_pois(load(st.eval_dir + 'pois.bin'), 'Pois level 1')
+    # visualize_weather(load(st.eval_dir + 'weather.bin'), 'Weather', '(Weather, Temp, PM25)')
+    visualize_pois(load(st.eval_dir + 'pois.bin'), 'Pois level 1')
 
 def preprocessing(date='*', interpolate_missing=False):
     # logging.info('Running preprocessing for: %s' % date)
-    # preprocess_pois()
-    preprocess_weather(date)
+    preprocess_pois()
+    # preprocess_weather(date)
     # preprocess_traffic(date, interpolate_missing)
     # preprocess_orders(date)
 
@@ -233,6 +243,78 @@ def training_sgd():
     # print 'coeff %s' % model.coef_
     return regr
 
+def build_training_data():
+    # traffic = load(st.eval_dir_test+'traffic.bin')
+    # if interpolate_missing:
+    #     traffic = interpolate_traffic(53)
+    # else:
+    #     traffic = load(st.eval_dir_test+'traffic.bin')
+    # traffic_train = np.asarray([norm(jam) for jam in load(st.eval_dir+'traffic.bin')])
+    traffic_train = load(st.eval_dir+'traffic.bin')
+    traffic_test = load(st.eval_dir_test+'traffic.bin')
+
+    destination = load(st.eval_dir+'dest_dist.bin')
+    start = load(st.eval_dir + 'start_dist.bin')
+    weather_train = load(st.eval_dir+'weather.bin')
+    weather_test = load(st.eval_dir_test+'weather.bin')
+
+    demand_test = load(st.eval_dir_test+'demand.bin')
+    demand_train = load(st.eval_dir+'demand.bin')
+    supply_test = load(st.eval_dir_test+'supply.bin')
+    supply_train = load(st.eval_dir+'supply.bin')
+    gap = load(st.eval_dir+'gap.bin')
+    gap_test = load(st.eval_dir_test+'gap.bin')
+    pois = load(st.eval_dir+'pois.bin')[:,:-15]
+
+    prediction_times = []
+    with open(st.data_dir_test + 'read_me_1.txt') as f:
+        prediction_date = f.read().splitlines()
+    for p in prediction_date:
+        prediction_times.append(p)
+    prediction_times = prediction_times[st.n_csv_header_lines:]
+    timeslots = [x.split('-')[3] for x in prediction_times]
+    n_pred_tisl = len(timeslots)
+
+    sample_d_t = []
+    gap_d_t = []
+    for d in range(st.n_districts):
+        for week_day in range(7):
+            for dtime_slt in range(st.n_timeslots):
+                dem = demand_test[week_day, d, dtime_slt]
+                if math.isnan(dem): dem = demand_train[week_day, d, dtime_slt]
+                supp = supply_test[week_day, d, dtime_slt]
+                if math.isnan(supp):  supp = supply_train[week_day, d, dtime_slt]
+                params = [week_day, dtime_slt, dem, supp]
+                sample_d_t.append(np.concatenate((params,
+                                                  traffic_train[week_day, d, dtime_slt, :].flatten(),
+                                                  pois.flatten(),
+                                                  destination[week_day, d].flatten(),
+                                                  start[week_day, d].flatten(),
+                                                  weather_train[week_day, dtime_slt,:].flatten()
+                                                  ), axis=0))
+                gap_d_t.append(gap[week_day, d, dtime_slt])
+
+    sample_d_t_test = []
+    gap_d_t_test = []
+    for d in range(st.n_districts):
+        for dtime_slt in range(n_pred_tisl):
+            week_day = datetime.datetime.strptime(prediction_times[dtime_slt][:10], '%Y-%m-%d').weekday()
+            dem = demand_test[week_day, d, dtime_slt]
+            if math.isnan(dem): dem = demand_train[week_day, d, dtime_slt]
+            supp = supply_test[week_day, d, dtime_slt]
+            if math.isnan(supp):  supp = supply_train[week_day, d, dtime_slt]
+            params = [week_day, dtime_slt, dem, supp]
+            sample_d_t_test.append(np.concatenate((params,
+                                                   traffic_test[week_day, d, dtime_slt, :].flatten(),
+                                                   pois.flatten(),
+                                                   destination[week_day, d].flatten(),
+                                                   start[week_day, d].flatten(),
+                                                   weather_test[week_day, dtime_slt,:].flatten()
+                                                   ), axis=0))
+            gap_d_t_test.append(gap_test[week_day, d, dtime_slt])
+    return gap, sample_d_t, sample_d_t_test, gap_d_t, gap_d_t_test, prediction_times, n_pred_tisl
+
+
 def prediction_sgd(model, interpolate_missing=False):
     print 'predict values'
     prediction_times = []
@@ -270,81 +352,9 @@ def prediction_sgd(model, interpolate_missing=False):
     prediction_postprocessing(s, gap, prediction_times, n_pred_tisl)
 
 def train_nn(interpolate_missing=False):
-    # traffic = load(st.eval_dir_test+'traffic.bin')
-    # if interpolate_missing:
-    #     traffic = interpolate_traffic(53)
-    # else:
-    #     traffic = load(st.eval_dir_test+'traffic.bin')
-    # traffic_train = np.asarray([norm(jam) for jam in load(st.eval_dir+'traffic.bin')])
-    traffic_train = load(st.eval_dir+'traffic.bin')
-    traffic_test = load(st.eval_dir_test+'traffic.bin')
-
-    destination = load(st.eval_dir+'dest_dist.bin')
-    start = load(st.eval_dir + 'start_dist.bin')
-    # weather_train = load(st.eval_dir+'weather.bin')
-    # weather_test = load(st.eval_dir_test+'weather.bin')
-
-    demand_test = load(st.eval_dir_test+'demand.bin')
-    demand_train = load(st.eval_dir+'demand.bin')
-    supply_test = load(st.eval_dir_test+'supply.bin')
-    supply_train = load(st.eval_dir+'supply.bin')
-    gap = load(st.eval_dir+'gap.bin')
-    gap_test = load(st.eval_dir_test+'gap.bin')
-    pois = load(st.eval_dir+'pois.bin')[:,:-15]
-
-    prediction_times = []
-    with open(st.data_dir_test + 'read_me_1.txt') as f:
-        prediction_date = f.read().splitlines()
-    for p in prediction_date:
-        prediction_times.append(p)
-    prediction_times = prediction_times[st.n_csv_header_lines:]
-    timeslots = [x.split('-')[3] for x in prediction_times]
-    n_pred_tisl = len(timeslots)
-
-    sample_d_t = []
-    gap_d_t = []
-    for d in range(st.n_districts):
-        for week_day in range(7):
-            for dtime_slt in range(st.n_timeslots):
-                dem = demand_test[week_day, d, dtime_slt]
-                if math.isnan(dem): dem = demand_train[week_day, d, dtime_slt]
-                supp = supply_test[week_day, d, dtime_slt]
-                if math.isnan(supp):  supp = supply_train[week_day, d, dtime_slt]
-                params = [week_day, dtime_slt, dem, supp]
-                sample_d_t.append(np.concatenate((params,
-                                                  traffic_train[week_day, d, dtime_slt, :].flatten(),
-                                                  pois.flatten(),
-                                                  destination[week_day, d].flatten(),
-                                                  start[week_day, d].flatten()
-                                                  # ,
-                                                  # weather_train[week_day, dtime_slt,:].flatten()
-                                                  ), axis=0))
-                gap_d_t.append(gap[week_day, d, dtime_slt])
-
-    sample_d_t_test = []
-    gap_d_t_test = []
-    for d in range(st.n_districts):
-        for dtime_slt in range(n_pred_tisl):
-            week_day = datetime.datetime.strptime(prediction_times[dtime_slt][:10], '%Y-%m-%d').weekday()
-            dem = demand_test[week_day, d, dtime_slt]
-            if math.isnan(dem): dem = demand_train[week_day, d, dtime_slt]
-            supp = supply_test[week_day, d, dtime_slt]
-            if math.isnan(supp):  supp = supply_train[week_day, d, dtime_slt]
-            params = [week_day, dtime_slt, dem, supp]
-            sample_d_t_test.append(np.concatenate((params,
-                                                   traffic_test[week_day, d, dtime_slt, :].flatten(),
-                                                   pois.flatten(),
-                                                   destination[week_day, d].flatten(),
-                                                   start[week_day, d].flatten()
-                                                   # ,
-                                                   # weather_test[week_day, dtime_slt,:].flatten()
-                                                   ), axis=0))
-            gap_d_t_test.append(gap_test[week_day, d, dtime_slt])
-
-
+    gap, sample_d_t, sample_d_t_test, gap_d_t, gap_d_t_test, prediction_times, n_pred_tisl= build_training_data()
     cut = 10000
     tr = [np.asarray(sample_d_t[:-cut]), np.asarray(gap_d_t[:-cut])]
-    # tr = [np.asarray(sample_d_t), np.asarray(gap_d_t)]
     print 'train: %s  %s'  % (tr[0].shape, tr[1].shape)
     va = [np.asarray(sample_d_t[-cut:]), np.asarray(gap_d_t[-cut:])]
     te = [np.asarray(sample_d_t_test), np.asarray(gap_d_t_test)]
@@ -365,18 +375,18 @@ def train_nn(interpolate_missing=False):
 if __name__ == "__main__":
     date = '2016-01-*'
 
-    started_at = datetime.datetime.now()
-    logging.info('------')
-    logging.info('Started at: %s' % started_at)
-    print(started_at)
+    # started_at = datetime.datetime.now()
+    # logging.info('------')
+    # logging.info('Started at: %s' % started_at)
+    # print(started_at)
 
-    # preprocessing(date, interpolate_missing=False)
-    # visualizations()
+    preprocessing(date, interpolate_missing=False)
+    visualizations()
 
     # model = training_sgd()
     # prediction_sgd(model)
-    train_nn()
+    # train_nn()
 
-    finished_at = datetime.datetime.now()
-    print(finished_at)
-    logging.info('Finished at: %s' % finished_at)
+    # finished_at = datetime.datetime.now()
+    # print(finished_at)
+    # logging.info('Finished at: %s' % finished_at)

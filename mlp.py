@@ -20,12 +20,8 @@ class LinearRegression(object):
 
         self.params = [self.W, self.b]
 
-    # def negative_log_likelihood(self, y):
-    #     return -T.mean(T.log(self.p_y_given_x)[T.arange(y.shape[0]), y])
-
     def errors(self, y):
         return T.sum(T.sqr(y-self.y_pred))
-
 
 class HiddenLayer(object):
 
@@ -61,8 +57,7 @@ class HiddenLayer(object):
         self.params = [self.W, self.b]
 
 class MLP(object):
-    def __init__(self, rng, input, n_in, n_hidden, n_out, active_func_name,
-                        W_hidden=None, b_hidden=None, W_log=None, b_log=None):
+    def __init__(self, rng, input, n_in, n_hidden, n_out, active_func_name, W_hidden1=None, b_hidden1=None, W_hidden2=None, b_hidden2=None, W_log=None, b_log=None):
 
         activ_func = T.tanh
         if active_func_name == 'Logistic sigmoid':
@@ -70,36 +65,48 @@ class MLP(object):
         elif active_func_name == 'Rectified linear unit':
             activ_func = T.nnet.relu
 
-        self.hiddenLayer = HiddenLayer(
+        self.hiddenLayer1 = HiddenLayer(
             rng=rng,
             input=input,
             n_in=n_in,
             n_out=n_hidden,
-            W = W_hidden,
-            b = b_hidden,
+            W = W_hidden1,
+            b = b_hidden1,
+            activation=activ_func
+        )
+
+        self.hiddenLayer2 = HiddenLayer(
+            rng=rng,
+            input=self.hiddenLayer1.output,
+            n_in=n_hidden,
+            n_out=n_hidden,
+            W=W_hidden2,
+            b=b_hidden2,
             activation=activ_func
         )
 
         self.outputLayer = LinearRegression(
-            input = self.hiddenLayer.output,
+            # input=self.hiddenLayer1.output,
+            input = self.hiddenLayer2.output,
             W=W_log,
             b=b_log
         )
 
         self.L1 = (
-            abs(self.hiddenLayer.W).sum()
+            abs(self.hiddenLayer1.W).sum()
+            + abs(self.hiddenLayer2.W).sum()
             + abs(self.outputLayer.W).sum()
         )
 
         self.L2_sqr = (
-              (self.hiddenLayer.W ** 2).sum()
+              (self.hiddenLayer1.W ** 2).sum()
+            + (self.hiddenLayer2.W ** 2).sum()
             + (self.outputLayer.W ** 2).sum()
         )
 
-        # self.negative_log_likelihood = self.outputLayer.negative_log_likelihood
         self.errors = self.outputLayer.errors
         self.y_pred = self.outputLayer.y_pred
-        self.params = self.hiddenLayer.params + self.outputLayer.params
+        self.params = self.hiddenLayer1.params + self.hiddenLayer2.params + self.outputLayer.params
         self.input = input
 
 def mlp_train(logging, data_train, data_validate, data_test):
@@ -107,18 +114,20 @@ def mlp_train(logging, data_train, data_validate, data_test):
     valid_set_x, valid_set_y = data_validate
     test_set_x, test_set_y = data_test
 
-    batch_size = 14000
+    batch_size = 10000
     n_in = train_set_x.shape[1]
     n_out = batch_size
-    n_hidden = 800
-    n_epochs = 10
+    n_hidden = 1000
+    n_epochs = 20
     opt_name = 'RmsProp'    #'GradientDescent'
-    active_func_name = 'Rectified linear unit'  #'T.tanh'
+    active_func_name = 'Rectified linear unit'  #'tanh'
     n_train_batches = train_set_x.shape[0] // batch_size
 
     rng = np.random.RandomState(1234)
-    tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_out), n_out]
-    wrt_flat, (Weights_hidden, bias_hidden, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
+    tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_hidden), n_hidden,(n_hidden, n_out), n_out]
+    wrt_flat, (Weights_hidden1, bias_hidden1, Weights_hidden2, bias_hidden2, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
+    # tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_out), n_out]
+    # wrt_flat, (Weights_hidden1, bias_hidden1, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
     climin.initialize.randomize_normal(wrt_flat, 0, 0.01)
     print 'tmpl: %s ' % tmpl
 
@@ -139,18 +148,16 @@ def mlp_train(logging, data_train, data_validate, data_test):
         n_hidden=n_hidden,
         n_out=n_out,
         active_func_name=active_func_name,
-        W_hidden = theano.shared(value=Weights_hidden, name='Wh', borrow=True),
-        b_hidden = theano.shared(value=bias_hidden, name='bh', borrow=True),
+        W_hidden1 = theano.shared(value=Weights_hidden1, name='Wh', borrow=True),
+        b_hidden1 = theano.shared(value=bias_hidden1, name='bh', borrow=True),
+        W_hidden2=theano.shared(value=Weights_hidden2, name='Wh', borrow=True),
+        b_hidden2=theano.shared(value=bias_hidden2, name='bh', borrow=True),
         W_log = theano.shared(value=Weights_log, name='Wo', borrow=True),
         b_log = theano.shared(value=bias_log, name='bo', borrow=True)
     )
 
     L1_reg = 0.001
     L2_reg = 0.0001
-    # cost_reg = (classifier.negative_log_likelihood(y)
-                  # + L1_reg * classifier.L1
-                  # + L2_reg * classifier.L2_sqr
-    # )
     cost_reg = (classifier.errors(y)
                # + L1_reg * classifier.L1
                # + L2_reg * classifier.L2_sqr
@@ -169,8 +176,10 @@ def mlp_train(logging, data_train, data_validate, data_test):
     )
 
     def d_loss_wrt_pars(parameters, inputs, targets):
-        g_W_h, g_b_h, g_W_l, g_b_l = gradients(inputs, targets)
-        return np.concatenate([g_W_h.flatten(), g_b_h, g_W_l.flatten(), g_b_l])
+        g_W_h, g_b_h, g_W_h2, g_b_h2, g_W_l, g_b_l = gradients(inputs, targets)
+        return np.concatenate([g_W_h.flatten(), g_b_h, g_W_h2.flatten(), g_b_h2, g_W_l.flatten(), g_b_l])
+        # g_W_h, g_b_h, g_W_l, g_b_l = gradients(inputs, targets)
+        # return np.concatenate([g_W_h.flatten(), g_b_h, g_W_l.flatten(), g_b_l])
 
     zero_one_loss = theano.function(
         inputs = [x, y],
@@ -178,7 +187,7 @@ def mlp_train(logging, data_train, data_validate, data_test):
         allow_input_downcast = True
     )
 
-    print('... training: hidden layer act func: %s, lin reg optimizer: %s)' % (active_func_name, opt_name))
+    print('... training: hidden layer act func: %s, lin reg optimizer: %s' % (active_func_name, opt_name))
 
     train_loss = []
     valid_loss = []
@@ -205,10 +214,16 @@ def mlp_train(logging, data_train, data_validate, data_test):
         opt = climin.Lbfgs(wrt_flat, loss, d_loss_wrt_pars, args=args)
     elif opt_name == 'Nlcg':
         opt = climin.NonlinearConjugateGradient(wrt_flat, loss, d_loss_wrt_pars, args=args)
-    # elif opt_name == 'GradientDescent':
-    #     opt = climin.GradientDescent(wrt_flat, d_loss_wrt_pars, step_rate=0.1, momentum=.95, args=args)
+    elif opt_name == 'GradientDescent':
+        step = 0.1
+        momentum = .95
+        opt = climin.GradientDescent(wrt_flat, d_loss_wrt_pars, step_rate=step, momentum=momentum, args=args)
+        logging.info('GradientDescent step rate: %s, momentum %s' % (step, momentum))
     elif opt_name == 'RmsProp':
-        opt = climin.RmsProp(wrt_flat, d_loss_wrt_pars, step_rate=1e-4, decay=0.9, args=args)
+        step = 1e-5
+        dec = 0.9
+        opt = climin.RmsProp(wrt_flat, d_loss_wrt_pars, step_rate=step, decay=dec, args=args)
+        logging.info('RmsProp step rate: %s, decay %s' % (step, dec))
     elif opt_name == 'Rprop':
         opt = climin.Rprop(wrt_flat, d_loss_wrt_pars, args=args)
     elif opt_name == 'Adam':
@@ -216,8 +231,8 @@ def mlp_train(logging, data_train, data_validate, data_test):
                           decay_mom2=0.001, momentum=0, offset=1e-08, args=args)
     elif opt_name == 'Adadelta':
         opt = climin.Adadelta(wrt_flat, d_loss_wrt_pars, step_rate=1, decay=0.9, momentum=.95, offset=0.0001, args=args)
-    else:
-        opt = climin.GradientDescent(wrt_flat, d_loss_wrt_pars, step_rate=1e-11, momentum=.95, args=args)
+    # else:
+        # opt = climin.GradientDescent(wrt_flat, d_loss_wrt_pars, step_rate=1e-11, momentum=.95, args=args)
 
     for info in opt:
         iter = info['n_iter']

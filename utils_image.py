@@ -34,14 +34,14 @@ def visualize_pois(data, title):
     plt.savefig(st.eval_dir+title+'.png')
     plt.close()
 
-def visualize_poi_correlation(data, title):
+def visualize_correlation(data, title):
     print 'plotting %s' % title
 
-    plt.imshow(data.transpose(), interpolation='none', cmap=st.colormap)
+    plt.imshow(data.transpose(), interpolation='none', cmap='bwr')
     plt.colorbar()
     plt.suptitle(title)
 
-    plt.savefig(st.eval_dir+title+'.png')
+    plt.savefig(title+'.png')
     plt.close()
 
 def visualize_prediction(data, title, n_time_slots, timestmp, normalize=False):
@@ -101,16 +101,18 @@ def visualize_orders(data, title, normalize=False):
 
 def visualize_weather(data, name, title):
     print 'plotting %s' % title
-    fig = plt.figure(figsize=(20, 10))
-    for day in range(7):
+    fig = plt.figure(figsize=(20, 30))
+    for day in range(0, st.n_train_days):
         for obj in range(3):
-            ax2 = plt.subplot2grid((7, 3), (day, obj))
+            ax2 = plt.subplot2grid((st.n_train_days, 3), (day, obj))
             colors = ['red', 'green', 'blue']
             ax2.plot(data[day,:,obj], color=colors[obj])
+            ax2.set_xticks(xrange(0, 144, 10))
             plt.xlim((0, st.n_timeslots))
     fig.suptitle(name+' '+title, fontsize=20)
     plt.tight_layout()
     plt.savefig(st.eval_dir+name+'.png')
+    plt.show()
     plt.close()
 
 def hist(data, title, y_range=None):

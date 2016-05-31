@@ -3,17 +3,12 @@
 from sys import stdout
 import logging
 import glob
-import time
-import numpy as np
 import theano
-import theano.tensor as T
 from sklearn import linear_model
 import math
-import statics as st
 from mlp import mlp_train
 from data_container import IncMap, create_distr_Map
 from utils_file import merge_files, load, save, load_csv, load_test_data, save_predictions
-# from utils_image import visualize, visualize_mult, visualize_oneDim, visualize_pois, visualize_prediction, hist
 from utils_image import *
 from utils_data import norm, toUTCtimestamp, get_timeslot
 
@@ -109,14 +104,15 @@ def preprocess_orders(date):
 
 def preprocess_weather(date):
     print 'preprocessing weather'
-    weather_mat = np.zeros(shape=(7, int(st.n_timeslots), 4))
+    weather_mat = np.zeros(shape=(st.n_train_days, int(st.n_timeslots), 3))
     for w_file in glob.glob(st.data_dir + 'weather_data_' + date):
+        day_idx = int(w_file[-2:])#.replace('-', ''))
         w_data = load_csv(w_file)
 
-        if st.data_dir == 'data/':
-            week_day = datetime.datetime.strptime(w_file[-10:], '%Y-%m-%d').weekday()
-        else:
-            week_day = datetime.datetime.strptime(w_file[-10-st.cut_off_test:-st.cut_off_test], '%Y-%m-%d').weekday()
+        # if st.data_dir == 'data/':
+        #     week_day = datetime.datetime.strptime(w_file[-10:], '%Y-%m-%d').weekday()
+        # else:
+        #     week_day = datetime.datetime.strptime(w_file[-10-st.cut_off_test:-st.cut_off_test], '%Y-%m-%d').weekday()
 
         for sing_w in w_data:
             w_dict = dict(zip(st.weather_keys, sing_w))
@@ -125,10 +121,12 @@ def preprocess_weather(date):
             w_pm25 = w_dict[st.w_pm25]
             w_weather = w_dict[st.w_weather]
 
+            print day_idx
+            weather_mat[day_idx-1][tslot_idx] = [w_weather, w_temp, w_pm25]
             # weather_mat[week_day][tslot_idx][0] = time.mktime(datetime.datetime.strptime(w_dict[st.time], '%Y-%m-%d %H:%M:%S').timetuple())
-            weather_mat[week_day][tslot_idx][0] = w_weather
-            weather_mat[week_day][tslot_idx][1] = w_temp
-            weather_mat[week_day][tslot_idx][2] = w_pm25
+            # weather_mat[week_day][tslot_idx][0] = w_weather
+            # weather_mat[week_day][tslot_idx][1] = w_temp
+            # weather_mat[week_day][tslot_idx][2] = w_pm25
 
     save(st.eval_dir+'weather', weather_mat)
 
@@ -155,57 +153,27 @@ def preprocess_pois():
     save(st.eval_dir+'pois', norm(poi_map))
 
 def visualizations(interpolate_missing=False):
-    visualize_orders(load(st.eval_dir+'demand.bin'), 'Demand', normalize=True)
-    visualize_orders(load(st.eval_dir+'supply.bin'), 'Supply', normalize=True)
-    visualize_orders(load(st.eval_dir+'gap.bin'), 'Gap', normalize=True)
-    hist(load(st.eval_dir+'start_dist.bin'), 'Start_dist', y_range=[70, 180000])
-    hist(load(st.eval_dir+'dest_dist.bin'), 'Dest_dist', y_range=[70, 120000])
+    # visualize_orders(load(st.eval_dir+'demand.bin'), 'Demand', normalize=True)
+    # visualize_orders(load(st.eval_dir+'supply.bin'), 'Supply', normalize=True)
+    # visualize_orders(load(st.eval_dir+'gap.bin'), 'Gap', normalize=True)
+    # hist(load(st.eval_dir+'start_dist.bin'), 'Start_dist', y_range=[70, 180000])
+    # hist(load(st.eval_dir+'dest_dist.bin'), 'Dest_dist', y_range=[70, 120000])
+    #
+    # if interpolate_missing:
+    #     traffic_data = interpolate_traffic(53)
+    #     visualize_traffic(traffic_data, 'Traffic', normalize=True)
+    # else:
+    #     visualize_traffic(load(st.eval_dir + 'traffic.bin'), 'Traffic', normalize=True)
 
-    if interpolate_missing:
-        traffic_data = interpolate_traffic(53)
-        visualize_traffic(traffic_data, 'Traffic', normalize=True)
-    else:
-        visualize_traffic(load(st.eval_dir + 'traffic.bin'), 'Traffic', normalize=True)
-
-    visualize_weather(load(st.eval_dir + 'weather.bin'), 'Weather', '(Temp, PM25, Type)')
-    visualize_pois(load(st.eval_dir + 'pois.bin'), 'Pois level 1')
+    visualize_weather(load(st.eval_dir + 'weather.bin'), 'Weather', '(Weather, Temp, PM25)')
+    # visualize_pois(load(st.eval_dir + 'pois.bin'), 'Pois level 1')
 
 def preprocessing(date='*', interpolate_missing=False):
-    logging.info('Running preprocessing for: %s' % date)
-    preprocess_pois()
+    # logging.info('Running preprocessing for: %s' % date)
+    # preprocess_pois()
     preprocess_weather(date)
-    preprocess_traffic(date, interpolate_missing)
-    preprocess_orders(date)
-
-def poi_correlation():
-    weekday = 0
-
-    # pois = load(st.eval_dir + 'pois.bin')   #66x30
-    # poi0 = np.repeat(pois[:,0], 144, axis=0).reshape((66, 144))
-    # print poi0.shape
-
-    demand = load(st.eval_dir + 'demand.bin')[:,:,:].reshape((66, 7*144))   #7x66x144
-    print demand.shape
-
-    supply = load(st.eval_dir + 'supply.bin')[:, :, :].reshape((66, 7*144))  # 7x66x144
-    print supply.shape
-
-
-    traffic_per_time = np.mean(load(st.eval_dir + 'traffic.bin'), axis=3)[:,:].reshape((66, 7*144))  # 7x66x144x4
-    print traffic_per_time.shape
-
-    pearR = np.corrcoef(demand, supply)
-    # pearR = np.corrcoef(demand, poi0)
-
-    # traf = load(st.eval_dir + 'traffic.bin')
-    # print traf[0,:,:,0].shape
-    # pearR = np.corrcoef(traf[0,:,:,0], traf[0,:,:,0])
-
-
-    # pearR = np.corrcoef(traf[0,:,0,0], pois[:,0])
-    print pearR
-    print pearR.shape
-    visualize_poi_correlation(pearR, 'corr')
+    # preprocess_traffic(date, interpolate_missing)
+    # preprocess_orders(date)
 
 def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
     save_timestmp = toUTCtimestamp(datetime.datetime.utcnow())
@@ -313,8 +281,8 @@ def train_nn(interpolate_missing=False):
 
     destination = load(st.eval_dir+'dest_dist.bin')
     start = load(st.eval_dir + 'start_dist.bin')
-    weather_train = load(st.eval_dir+'weather.bin')
-    weather_test = load(st.eval_dir_test+'weather.bin')
+    # weather_train = load(st.eval_dir+'weather.bin')
+    # weather_test = load(st.eval_dir_test+'weather.bin')
 
     demand_test = load(st.eval_dir_test+'demand.bin')
     demand_train = load(st.eval_dir+'demand.bin')
@@ -347,8 +315,10 @@ def train_nn(interpolate_missing=False):
                                                   traffic_train[week_day, d, dtime_slt, :].flatten(),
                                                   pois.flatten(),
                                                   destination[week_day, d].flatten(),
-                                                  start[week_day, d].flatten(),
-                                                  weather_train[week_day, dtime_slt,:].flatten()), axis=0))
+                                                  start[week_day, d].flatten()
+                                                  # ,
+                                                  # weather_train[week_day, dtime_slt,:].flatten()
+                                                  ), axis=0))
                 gap_d_t.append(gap[week_day, d, dtime_slt])
 
     sample_d_t_test = []
@@ -365,12 +335,14 @@ def train_nn(interpolate_missing=False):
                                                    traffic_test[week_day, d, dtime_slt, :].flatten(),
                                                    pois.flatten(),
                                                    destination[week_day, d].flatten(),
-                                                   start[week_day, d].flatten(),
-                                                   weather_test[week_day, dtime_slt,:].flatten()), axis=0))
+                                                   start[week_day, d].flatten()
+                                                   # ,
+                                                   # weather_test[week_day, dtime_slt,:].flatten()
+                                                   ), axis=0))
             gap_d_t_test.append(gap_test[week_day, d, dtime_slt])
 
 
-    cut = 1000
+    cut = 10000
     tr = [np.asarray(sample_d_t[:-cut]), np.asarray(gap_d_t[:-cut])]
     # tr = [np.asarray(sample_d_t), np.asarray(gap_d_t)]
     print 'train: %s  %s'  % (tr[0].shape, tr[1].shape)
@@ -391,14 +363,12 @@ def train_nn(interpolate_missing=False):
     prediction_postprocessing(prediction, gap, prediction_times, n_pred_tisl)
 
 if __name__ == "__main__":
-    date = '2016-01-01'
+    date = '2016-01-*'
 
     started_at = datetime.datetime.now()
     logging.info('------')
     logging.info('Started at: %s' % started_at)
     print(started_at)
-
-    # poi_correlation()
 
     # preprocessing(date, interpolate_missing=False)
     # visualizations()

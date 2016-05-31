@@ -8,7 +8,7 @@ import time
 from datetime import datetime, timedelta
 
 def get_timeslot_time(year, month, day, timeslot_idx):
-    return time.mktime(datetime.datetime.strptime(('%s-%s-%s' % (year, month, day)), '%Y-%m-%d').timetuple())
+    return time.mktime(datetime.strptime(('%s-%s-%s' % (year, month, day)), '%Y-%m-%d').timetuple())
 
 def get_timeslot(time_point):
     '''
@@ -20,7 +20,7 @@ def get_timeslot(time_point):
     return int(np.floor((curr - morning) / 10/60))
 
 def toTimeStmp(time_str):
-    return time.mktime(datetime.datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S").timetuple())
+    return time.mktime(datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S").timetuple())
 
 def toUTCtimestamp(dt, epoch=datetime(1970, 1, 1)):
     td = dt - epoch

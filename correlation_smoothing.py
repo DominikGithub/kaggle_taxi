@@ -34,23 +34,26 @@ def poi_correlation():
     # pearR = np.corrcoef(traf[0,:,0,0], pois[:,0])
     print pearR
     print pearR.shape
-    visualize_poi_correlation(pearR, 'corr')
+    visualize_correlation(pearR, 'corr')
 
-def weather_correlation():
+def weather_correlation(filename):
     weather = load(st.eval_dir + 'weather.bin')  # 21x144x3
+    # weather = load(filename)
     print weather.shape
 
-    pearR = np.corrcoef(weather[:,:,0], weather[:,:,1])
+    pearR = np.corrcoef(weather[:,:,1], weather[:,:,2])
     print pearR
     print pearR.shape
     visualize_correlation(pearR, 'corr')
 
 def smooth_weather():
     data = load(st.eval_dir+'weather.bin')
-    fig, axarr = plt.subplots(21, 3, figsize=(20, 30))
+    n_days = 21
+    name = 'weather'
 
-    smoothed = np.ndarray((st.n_train_days, 3, 144))
-    for day in range(st.n_train_days):
+    fig, axarr = plt.subplots(n_days, 3, figsize=(20, 30))
+    smoothed = np.ndarray((n_days, 3, 144))
+    for day in range(n_days):
         for objective in range(0, 3):
             S = pd.Series(data[day, :, objective])
             outlier_idx = S[S.pct_change() == np.inf].index.values-1
@@ -68,15 +71,51 @@ def smooth_weather():
         axarr[day, 2].set_xticks(xrange(0, 144, 11))
         axarr[day, 2].plot(smoothed[day, 2], color='blue')
 
-    save(st.eval_dir+'weather', smoothed)
+    save(st.eval_dir+name, smoothed)
 
     fig.suptitle('Weather, Temp, PM25', fontsize=20)
-    plt.savefig('smoothed.png')
+    plt.savefig(name+'.png')
     plt.close()
 
+def smooth_weather_test():
+    data = load(st.eval_dir_test+'weather.bin')
+    n_days = 5
+    name = 'weather_test'
+
+    fig, axarr = plt.subplots(n_days, 3, figsize=(20, 10))
+    smoothed = np.ndarray((n_days, 3, 144))
+    for day in range(n_days):
+        for objective in range(0, 3):
+            # S = pd.Series(data[day, :, objective])
+            # outlier_idx = S[S.pct_change() == np.inf].index.values-1
+            # outlier = S[~(S==0)].copy()
+            # print outlier.index.values
+
+            # outlier[outlier_idx] = np.nan
+            # outlier = outlier.interpolate(method='pchip')
+
+            smoothed[day, objective, :] = pd.rolling_max(data[day, :, objective], window=13, center=True)
+
+            # df = pd.DataFrame(smoothed[day, objective, :])
+            # smoothed[day, objective, :] = df.rolling(window=4, center=True).median().values.flatten()
+
+        axarr[day, 0].set_xticks(xrange(0, 144, 11))
+        axarr[day, 0].plot(smoothed[day, 0], color='green')
+        axarr[day, 1].set_xticks(xrange(0, 144, 11))
+        axarr[day, 1].plot(smoothed[day, 1], color='red')
+        axarr[day, 2].set_xticks(xrange(0, 144, 11))
+        axarr[day, 2].plot(smoothed[day, 2], color='blue')
+
+    save(st.eval_dir+name, smoothed)
+
+    fig.suptitle('Weather, Temp, PM25', fontsize=20)
+    plt.savefig(name+'.png')
+    plt.close()
 
 if __name__ == "__main__":
-    # weather_correlation()
+    # name = 'weather.bin'
+    # weather_correlation(st.eval_dir+name)
     smooth_weather()
+    smooth_weather_test()
 
     # visualize_weather(data, 'Weather', '(Weather, Temp, PM25)')

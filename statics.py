@@ -16,7 +16,7 @@ n_csv_header_lines = 1
 
 colormap='plasma'
 
-n_train_days = 21
+n_train_days = 21   #5
 n_districts = 66   # 66 kown disctricts + unkonwn many unkonwn
 n_timeslots = 144
 

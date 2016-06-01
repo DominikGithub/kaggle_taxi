@@ -59,7 +59,7 @@ def save(filename, data):
     output.close()
 
 def save_predictions(timeslots, predictions, timestmp):
-    with open(st.eval_dir_test+'predictions_'+str(timestmp)+'.csv', 'wb') as f:
+    with open('predictions/predictions_'+str(timestmp)+'.csv', 'wb') as f:
         writer = csv.writer(f, delimiter=',')
 
         csv_data = ['District ID', 'Time slot', 'Prediction value']

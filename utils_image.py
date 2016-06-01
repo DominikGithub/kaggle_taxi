@@ -64,7 +64,7 @@ def visualize_prediction(data, title, n_time_slots, timestmp, normalize=False):
     plt.colorbar()
     plt.suptitle(title)
 
-    plt.savefig(st.eval_dir_test+title+'_'+str(timestmp)+'.png')
+    plt.savefig('predictions/'+title+'_'+str(timestmp)+'.png')
     plt.close()
 
 def visualize_traffic(data, title, normalize=False):

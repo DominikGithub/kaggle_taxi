@@ -114,11 +114,12 @@ def mlp_train(logging, data_train, data_validate, data_test):
     valid_set_x, valid_set_y = data_validate
     test_set_x, test_set_y = data_test
 
+    add_L1_L2_regressor = False
     batch_size = 16000
     n_in = train_set_x.shape[1]
     n_out = batch_size
-    n_hidden = 100
-    n_epochs = 30
+    n_hidden = 200
+    n_epochs = 100
     opt_name = 'Adadelta'   # 'RmsProp' #'GradientDescent'
     active_func_name = 'Rectified linear unit'  #'tanh'
     n_train_batches = train_set_x.shape[0] // batch_size
@@ -156,12 +157,17 @@ def mlp_train(logging, data_train, data_validate, data_test):
         b_log = theano.shared(value=bias_log, name='bo', borrow=True)
     )
 
-    L1_reg = 0.001
-    L2_reg = 0.0001
-    cost_reg = (classifier.errors(y)
-               + L1_reg * classifier.L1
-               + L2_reg * classifier.L2_sqr
-    )
+    if add_L1_L2_regressor:
+        L1_reg = 0.001
+        L2_reg = 0.0001
+        cost_reg = (classifier.errors(y)
+                   + L1_reg * classifier.L1
+                   + L2_reg * classifier.L2_sqr
+        )
+        logging.info('Loss L1/L2 regressor L1: %s L2: %s' % (L1_reg, L2_reg))
+    else:
+        cost_reg = classifier.errors(y)
+        logging.info('Loss L1/L2 regressor: None')
 
     loss = theano.function(
         inputs = [x, y],

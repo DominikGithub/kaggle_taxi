@@ -35,5 +35,5 @@ weather: [21 x 3 x 144]=[days x types x timeslots]
 traffic:
 demand:
 supply:
-gap:
-pois: 
+gap: [7 x 66 x 144]
+pois: []

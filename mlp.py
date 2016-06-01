@@ -119,7 +119,7 @@ def mlp_train(logging, data_train, data_validate, data_test):
     n_in = train_set_x.shape[1]
     n_out = batch_size
     n_hidden = 200
-    n_epochs = 100
+    n_epochs = 1
     opt_name = 'Adadelta'   # 'RmsProp' #'GradientDescent'
     active_func_name = 'Rectified linear unit'  #'tanh'
     n_train_batches = train_set_x.shape[0] // batch_size

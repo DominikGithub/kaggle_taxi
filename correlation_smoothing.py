@@ -46,7 +46,20 @@ def weather_correlation(filename):
     print pearR.shape
     visualize_correlation(pearR, 'corr')
 
-def smooth_weather():
+def interpolate_traffic(district_idx):
+    week = load(st.eval_dir + 'traffic.bin')
+    all_days = np.ndarray((7, st.n_districts, 144, 4))
+    idx = 0
+    for day in week:
+        clean_data = np.delete(day, district_idx, axis=0)
+        mean_traffic = np.sum(clean_data, axis=0, keepdims=True) / len(clean_data)
+        first = day[:district_idx,:,:]
+        second = day[district_idx+1:,:,:]
+        all_days[idx] = np.concatenate((first, mean_traffic, second), axis=0)
+        idx += 1
+    return all_days
+
+def smooth_weather_train():
     data = load(st.eval_dir+'weather.bin')
     n_days = 21
     name = 'weather'
@@ -106,7 +119,7 @@ def smooth_weather_test():
 if __name__ == "__main__":
     # name = 'weather.bin'
     # weather_correlation(st.eval_dir+name)
-    smooth_weather()
-    # smooth_weather_test()
+    smooth_weather_train()
+    smooth_weather_test()
 
     # visualize_weather(data, 'Weather', '(Weather, Temp, PM25)')

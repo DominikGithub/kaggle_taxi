@@ -114,12 +114,12 @@ def mlp_train(logging, data_train, data_validate, data_test):
     valid_set_x, valid_set_y = data_validate
     test_set_x, test_set_y = data_test
 
-    batch_size = 10000
+    batch_size = 16000
     n_in = train_set_x.shape[1]
     n_out = batch_size
-    n_hidden = 1000
-    n_epochs = 20
-    opt_name = 'RmsProp'    #'GradientDescent'
+    n_hidden = 100
+    n_epochs = 30
+    opt_name = 'Adadelta'   # 'RmsProp' #'GradientDescent'
     active_func_name = 'Rectified linear unit'  #'tanh'
     n_train_batches = train_set_x.shape[0] // batch_size
 
@@ -159,8 +159,8 @@ def mlp_train(logging, data_train, data_validate, data_test):
     L1_reg = 0.001
     L2_reg = 0.0001
     cost_reg = (classifier.errors(y)
-               # + L1_reg * classifier.L1
-               # + L2_reg * classifier.L2_sqr
+               + L1_reg * classifier.L1
+               + L2_reg * classifier.L2_sqr
     )
 
     loss = theano.function(
@@ -230,7 +230,12 @@ def mlp_train(logging, data_train, data_validate, data_test):
         opt = climin.Adam(wrt_flat, d_loss_wrt_pars, step_rate=0.0002, decay=0.99999999, decay_mom1=0.1,
                           decay_mom2=0.001, momentum=0, offset=1e-08, args=args)
     elif opt_name == 'Adadelta':
-        opt = climin.Adadelta(wrt_flat, d_loss_wrt_pars, step_rate=1, decay=0.9, momentum=.95, offset=0.0001, args=args)
+        step=1
+        dec = 0.9
+        mom = .95
+        offs=0.0001
+        opt = climin.Adadelta(wrt_flat, d_loss_wrt_pars, step_rate=step, decay=dec, momentum=mom, offset=offs, args=args)
+        logging.info('Adadelta step rate: %s, decay: %s, momentum: %s, offset: %s' % (step, dec, mom, offs))
     # else:
         # opt = climin.GradientDescent(wrt_flat, d_loss_wrt_pars, step_rate=1e-11, momentum=.95, args=args)
 

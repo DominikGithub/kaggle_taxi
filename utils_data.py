@@ -1,9 +1,7 @@
 #!/usr/bin/env /home/dominik/anaconda2/bin/python
 
 import numpy as np
-import theano
-import theano.tensor as T
-from theano import function as tfunc
+import pandas as pd
 import time
 from datetime import datetime, timedelta
 
@@ -41,5 +39,7 @@ def toUTCtimestamp(dt, epoch=datetime(1970, 1, 1)):
 #     return zca(data, eig_vecs, sqr_inv)
 
 def norm(data):
+    frac = np.zeros_like(data)
     row_sums = data.sum(axis=1, keepdims=True)
-    return data / row_sums
+    frac = data / row_sums
+    return np.nan_to_num(frac)

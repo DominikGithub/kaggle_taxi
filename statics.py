@@ -7,7 +7,7 @@ fileDir = os.path.dirname(os.path.realpath('__file__'))
 data_dir_test = 'data_test/'
 
 cut_off_test = 5
-data_dir = 'data/'#data_dir_test
+data_dir = 'data_train/'#data_dir_test
 
 eval_dir = data_dir+'evaluation/'
 eval_dir_test = data_dir_test+'evaluation/'
@@ -42,4 +42,4 @@ traffic_keys = [tj_district_hash, tj_level, time]
 weather_keys = [time, w_weather, w_temperature, w_pm25]
 
 n_poi_first = 26
-n_poi_second = 50
+n_poi_second = 19

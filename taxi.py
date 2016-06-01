@@ -3,7 +3,7 @@
 from sys import stdout
 import logging
 import theano
-from training_data_builder import Training_data_builder
+from learning_data_builder import Learning_data_builder
 from mlp import mlp_train
 from data_container import IncMap, create_distr_Map
 from utils_file import *
@@ -21,7 +21,7 @@ def preprocess_traffic(date, interpolate_missing=False):
     for traffic_file in glob.glob(st.data_dir+'traffic_data_'+date):
         traffic_data = load_csv(traffic_file)
 
-        if st.data_dir == 'data/':
+        if st.data_dir == 'data_train/':
             week_day = datetime.datetime.strptime(traffic_file[-10:], '%Y-%m-%d').weekday()
         else:
             week_day = datetime.datetime.strptime(traffic_file[-10-st.cut_off_test:-st.cut_off_test], '%Y-%m-%d').weekday()
@@ -94,7 +94,7 @@ def preprocess_weather(date):
         day_idx = int(w_file[-2:])#.replace('-', ''))
         w_data = load_csv(w_file)
 
-        # if st.data_dir == 'data/':
+        # if st.data_dir == 'data_train/':
         #     week_day = datetime.datetime.strptime(w_file[-10:], '%Y-%m-%d').weekday()
         # else:
         #     week_day = datetime.datetime.strptime(w_file[-10-st.cut_off_test:-st.cut_off_test], '%Y-%m-%d').weekday()
@@ -112,18 +112,19 @@ def preprocess_weather(date):
     smooth_weather_train()
     smooth_weather_test()
 
-def recursive(ndarray, keys, value, lvl):
+def poi_map_recursive(ndarray, keys, value, lvl):
     if len(keys) > 1:
-        ndarray[keys[0]] = recursive(ndarray[keys[0]], keys[1:], value, lvl+1)
+        ndarray[keys[0]] = poi_map_recursive(ndarray[keys[0]], keys[1:], value, lvl+1)
         return ndarray
-    ndarray[keys] = value
+    if len(keys) == 1:
+        ndarray[keys] = value
     return ndarray
 
 def preprocess_pois():
     print 'preprocessing pois'
     dist_map = create_distr_Map()
     poi_map = np.zeros(shape=(st.n_districts, st.n_poi_first, st.n_poi_second))
-    # poi_map = np.zeros(shape=(int(st.n_districts), int(st.n_poi_first)))
+    poi_map_simple = np.zeros(shape=(int(st.n_districts), int(st.n_poi_first)))
     pois = merge_files(glob.glob(st.data_dir+'poi_data'))
     for entry in pois:
         distr_hash = entry[0]
@@ -138,24 +139,30 @@ def preprocess_pois():
                 classes = p
 
             classes = [int(x) for x in classes.split('#')]
+            poi_map_simple[distr_idx, classes[0]] += int(num)
             try:
                 keys = [distr_idx]+classes
-                recursive(poi_map, keys, int(num), 0)
+                poi_map_recursive(poi_map, keys, int(num), 0)
             except:
-                raise Exception('More than 2 class levels found: %s %s' % len(classes, p))
+                raise Exception('class level outside poi_map size: %s' % p)
 
+    save(st.eval_dir+'pois_simple', norm(poi_map_simple))
     save(st.eval_dir+'pois', norm(poi_map))
 
 def preprocessing(date='*', interpolate_missing=False):
     logging.info('Running preprocessing for: %s' % date)
     preprocess_pois()
-    # preprocess_weather(date)
+    preprocess_weather(date)
     preprocess_traffic(date, interpolate_missing)
     preprocess_orders(date)
 
 def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
     save_timestmp = toUTCtimestamp(datetime.datetime.utcnow())
     pred_formatted = np.asarray([float('%.2f' % x) for x in data.tolist()]).reshape((st.n_districts, n_pred_tisl))
+
+    print 'min prediction: %f' % np.min(pred_formatted)
+
+    pred_formatted = pred_formatted-np.min(pred_formatted)      # TODO why is "-min" doing better???
     visualize_prediction((pred_formatted), 'prediction', n_pred_tisl, save_timestmp)
     pred_shaped = data.reshape((st.n_districts, n_pred_tisl))
     print 'predictions: %s' % pred_formatted
@@ -179,16 +186,25 @@ def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
     save_predictions(prediction_times, pred_formatted, save_timestmp)
 
 def train_nn(interpolate_missing=False):
-    builder = Training_data_builder()
-    # gap, sample_d_t, sample_d_t_test, gap_d_t, gap_d_t_test, prediction_times, n_pred_tisl = builder.build_training_data_per_day()
-    gap, sample_d_t, sample_d_t_test, gap_d_t, gap_d_t_test, prediction_times, n_pred_tisl = builder.build_training_data_per_week_day()
-    cut = 10000
-    tr = [np.asarray(sample_d_t[:-cut]), np.asarray(gap_d_t[:-cut])]
-    print 'train: %s  %s'  % (tr[0].shape, tr[1].shape)
-    va = [np.asarray(sample_d_t[-cut:]), np.asarray(gap_d_t[-cut:])]
-    te = [np.asarray(sample_d_t_test), np.asarray(gap_d_t_test)]
+    mape_factor_active = False
+    builder = Learning_data_builder()
+    # gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_day()
+    gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_week_day()
 
-    classifier = mlp_train(logging, tr, va, te)
+    print 'min: %f max: %f' % (np.min(sample_train), np.max(sample_train))
+
+    # sample_test= norm(np.asarray(sample_test))
+    # sample_train = norm(np.asarray(sample_train))
+    # gap_train = norm(np.asarray(gap_train))
+    # gap_test = norm(np.asarray(gap_test))
+
+    valid_size = 10000
+    tr = [np.asarray(sample_train[:-valid_size]), np.asarray(gap_train[:-valid_size])]
+    print 'train: %s  %s'  % (tr[0].shape, tr[1].shape)
+    va = [np.asarray(sample_train[-valid_size:]), np.asarray(gap_train[-valid_size:])]
+    te = [np.asarray(sample_test), np.asarray(gap_test)]
+
+    classifier = mlp_train(logging, tr, va, te, add_L1_L2_regressor=False)
 
     print '... prediction'
     predict_model = theano.function(
@@ -197,7 +213,13 @@ def train_nn(interpolate_missing=False):
         on_unused_input='warn'
     )
 
-    prediction = predict_model(np.asarray(sample_d_t_test, dtype=theano.config.floatX))# * 0.98  # TODO remove MAPE factor
+    prediction = predict_model(np.asarray(sample_test, dtype=theano.config.floatX))
+    if mape_factor_active:
+        mape_factor = 0.98
+        prediction *= mape_factor
+        logging.info('mape factor: %i' % mape_factor)
+
+
     print 'predition # results: %s ' % prediction.shape
     prediction_postprocessing(prediction, gap, prediction_times, n_pred_tisl)
 

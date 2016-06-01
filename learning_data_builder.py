@@ -3,9 +3,10 @@
 import math
 import datetime
 from utils_file import *
+from utils_data import norm
 import statics as st
 
-class Training_data_builder(object):
+class Learning_data_builder(object):
 
     def __init__(self, interpolate_missing=False):
         self.prediction_times = []
@@ -36,7 +37,8 @@ class Training_data_builder(object):
         self.supply_train = load(st.eval_dir + 'supply.bin')
         self.gap_train = load(st.eval_dir + 'gap.bin')
         self.gap_test = load(st.eval_dir_test + 'gap.bin')
-        # self.pois = load(st.eval_dir+'pois.bin')[:,:-15]
+        # self.pois = load(st.eval_dir+'pois.bin')
+        self.pois = load(st.eval_dir + 'pois_simple.bin')
 
     def build_training_data_per_day(self):
         pass
@@ -45,8 +47,8 @@ class Training_data_builder(object):
         pred_timeslots = [x.split('-')[3] for x in self.prediction_times]
         n_pred_tisl = len(pred_timeslots)
 
-        sample_d_t = []
-        gap_d_t = []
+        samples_train = []
+        gap_train = []
         for d in range(st.n_districts):
             for week_day in range(7):
                 for dtime_slt in range(st.n_timeslots):
@@ -55,38 +57,36 @@ class Training_data_builder(object):
                     supp = self.supply_test[week_day, d, dtime_slt]
                     if math.isnan(supp):  supp = self.supply_train[week_day, d, dtime_slt]
                     params = [week_day, dtime_slt, dem, supp]
-                    sample_d_t.append(np.concatenate((params,
-                                                      self.traffic_train[week_day, d, dtime_slt, :].flatten(),
-                                                      # self.pois[d].flatten(),
-                                                      self.destination_train[week_day, d].flatten(),
-                                                      self.start_train[week_day, d].flatten()
-                                                      # ,
-                                                      # self.weather_train[day, dtime_slt,:].flatten()
-                                                      ), axis=0))
-                    gap_d_t.append(self.gap_train[week_day, d, dtime_slt])
+                    samples_train.append(np.concatenate((params,
+                                                        norm(self.traffic_train[week_day, d, dtime_slt, :].flatten(), axis=0),
+                                                        norm(self.pois[d].flatten(), axis=0),
+                                                        self.destination_train[week_day, d].flatten(),
+                                                        self.start_train[week_day, d].flatten()
+                                                        # ,
+                                                        # self.weather_train[day, dtime_slt,:].flatten()
+                                                        ), axis=0))
+                    gap_train.append(self.gap_train[week_day, d, dtime_slt])
 
-        sample_d_t_test = []
-        gap_d_t_test = []
+        samples_test = []
+        gap_test = []
         for d in range(st.n_districts):
             for dtime_slt in range(n_pred_tisl):
                 week_day = datetime.datetime.strptime(self.prediction_times[dtime_slt][:10], '%Y-%m-%d').weekday()
-                if week_day == 0 or week_day == 2:
-                    continue
                 dem = self.demand_test[week_day, d, dtime_slt]
                 if math.isnan(dem): dem = self.demand_train[week_day, d, dtime_slt]
                 supp = self.supply_test[week_day, d, dtime_slt]
                 if math.isnan(supp):  supp = self.supply_train[week_day, d, dtime_slt]
                 params = [week_day, dtime_slt, dem, supp]
-                sample_d_t_test.append(np.concatenate((params,
-                                                       self.traffic_test[week_day, d, dtime_slt, :].flatten(),
-                                                       # pois[d].flatten(),
-                                                       self.destination_test[week_day, d].flatten(),
-                                                       self.start_test[week_day, d].flatten()
-                                                       # ,
-                                                       # self.weather_test[day, dtime_slt,:].flatten()
-                                                       ), axis=0))
-                gap_d_t_test.append(self.gap_test[week_day, d, dtime_slt])
-        return self.gap_train, sample_d_t, sample_d_t_test, gap_d_t, gap_d_t_test, self.prediction_times, n_pred_tisl
+                samples_test.append(np.concatenate((params,
+                                                    norm(self.traffic_test[week_day, d, dtime_slt, :].flatten(), axis=0),
+                                                    norm(self.pois[d].flatten(), axis=0),
+                                                    self.destination_test[week_day, d].flatten(),
+                                                    self.start_test[week_day, d].flatten()
+                                                    # ,
+                                                    # self.weather_test[day, dtime_slt,:].flatten()
+                                                    ), axis=0))
+                gap_test.append(self.gap_test[week_day, d, dtime_slt])
+        return self.gap_train, samples_train, samples_test, gap_train, gap_test, self.prediction_times, n_pred_tisl
 
     # def load_pred_times(self):
     #     prediction_times = []

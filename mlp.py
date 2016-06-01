@@ -109,20 +109,20 @@ class MLP(object):
         self.params = self.hiddenLayer1.params + self.hiddenLayer2.params + self.outputLayer.params
         self.input = input
 
-def mlp_train(logging, data_train, data_validate, data_test):
+def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor=False):
     train_set_x, train_set_y = data_train
     valid_set_x, valid_set_y = data_validate
     test_set_x, test_set_y = data_test
 
-    add_L1_L2_regressor = False
-    batch_size = 16000
+    batch_size = 18000
     n_in = train_set_x.shape[1]
     n_out = batch_size
-    n_hidden = 200
-    n_epochs = 1
+    n_hidden = 40
+    n_epochs = 10
     opt_name = 'Adadelta'   # 'RmsProp' #'GradientDescent'
     active_func_name = 'Rectified linear unit'  #'tanh'
     n_train_batches = train_set_x.shape[0] // batch_size
+    print 'training %i epochs' % n_epochs
 
     rng = np.random.RandomState(1234)
     tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_hidden), n_hidden,(n_hidden, n_out), n_out]
@@ -130,6 +130,7 @@ def mlp_train(logging, data_train, data_validate, data_test):
     # tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_out), n_out]
     # wrt_flat, (Weights_hidden1, bias_hidden1, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
     climin.initialize.randomize_normal(wrt_flat, 0, 0.01)
+
     print 'tmpl: %s ' % tmpl
 
     logging.info('Batch size: %s' % batch_size)

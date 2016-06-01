@@ -38,8 +38,8 @@ def toUTCtimestamp(dt, epoch=datetime(1970, 1, 1)):
 #     zca = tfunc([x, vc, mat_inv], whitening, allow_input_downcast=True)
 #     return zca(data, eig_vecs, sqr_inv)
 
-def norm(data):
+def norm(data, axis=1):
     frac = np.zeros_like(data)
-    row_sums = data.sum(axis=1, keepdims=True)
+    row_sums = data.sum(axis=axis, keepdims=True)
     frac = data / row_sums
     return np.nan_to_num(frac)

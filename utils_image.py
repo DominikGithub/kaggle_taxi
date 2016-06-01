@@ -8,22 +8,24 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from utils_data import norm
 from utils_file import load
+from correlation_smoothing import interpolate_traffic
 
 def visualizations(interpolate_missing=False):
-    visualize_orders(load(st.eval_dir+'demand.bin'), 'Demand', normalize=True)
-    visualize_orders(load(st.eval_dir+'supply.bin'), 'Supply', normalize=True)
-    visualize_orders(load(st.eval_dir+'gap.bin'), 'Gap', normalize=True)
-    hist(load(st.eval_dir+'start_dist.bin'), 'Start_dist', y_range=[70, 180000])
-    hist(load(st.eval_dir+'dest_dist.bin'), 'Dest_dist', y_range=[70, 120000])
-
-    if interpolate_missing:
-        traffic_data = interpolate_traffic(53)
-        visualize_traffic(traffic_data, 'Traffic', normalize=True)
-    else:
-        visualize_traffic(load(st.eval_dir + 'traffic.bin'), 'Traffic', normalize=True)
+    # visualize_orders(load(st.eval_dir+'demand.bin'), 'Demand', normalize=True)
+    # visualize_orders(load(st.eval_dir+'supply.bin'), 'Supply', normalize=True)
+    # visualize_orders(load(st.eval_dir+'gap.bin'), 'Gap', normalize=True)
+    # hist(load(st.eval_dir+'start_dist.bin'), 'Start_dist', y_range=[70, 180000])
+    # hist(load(st.eval_dir+'dest_dist.bin'), 'Dest_dist', y_range=[70, 120000])
+    #
+    # if interpolate_missing:
+    #     traffic_data = interpolate_traffic(53)
+    #     visualize_traffic(traffic_data, 'Traffic', normalize=True)
+    # else:
+    #     visualize_traffic(load(st.eval_dir + 'traffic.bin'), 'Traffic', normalize=True)
 
     # visualize_weather(load(st.data_dir + 'weather.bin'), 'Weather', '(Weather, Temp, PM25)')
     visualize_pois(load(st.eval_dir + 'pois.bin'), 'Pois level 1')
+    visualize(load(st.eval_dir + 'pois_simple.bin'), 'Pois level 1_simpel')
 
 def visualize(data, title, normalize=False):
     print 'plotting %s' % title
@@ -44,16 +46,16 @@ def visualize(data, title, normalize=False):
 def visualize_pois(data, title):
     print 'plotting %s' % title
 
-    fig = plt.figure(figsize=(40, 60))
+    fig = plt.figure(figsize=(30, 8))
     cols = st.n_poi_first // 2
     for fst in range(st.n_poi_first):
         for col in range(cols):
-            ax2 = plt.subplot2grid((st.n_poi_first, cols), (fst, col))
+            ax2 = plt.subplot2grid((2, st.n_poi_first//2), (fst//cols, col))
             ax2.imshow(data[:,fst,:].transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, st.n_poi_second])
             ax2.get_xaxis().set_visible(False)
             ax2.get_yaxis().set_visible(False)
 
-    plt.suptitle(title, fontsize=24)
+    plt.suptitle(title, fontsize=20)
     plt.tight_layout()
     plt.savefig(st.eval_dir+title+'.png')
     plt.close()

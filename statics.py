@@ -43,3 +43,5 @@ weather_keys = [time, w_weather, w_temperature, w_pm25]
 
 n_poi_first = 26
 n_poi_second = 19
+
+milli_sec_per_day = 64800

@@ -1,9 +1,9 @@
 #!/usr/bin/env /home/dominik/anaconda2/bin/python
 
 import numpy as np
-import pandas as pd
 import time
 from datetime import datetime, timedelta
+import statics as st
 
 def get_timeslot_time(year, month, day, timeslot_idx):
     return time.mktime(datetime.strptime(('%s-%s-%s' % (year, month, day)), '%Y-%m-%d').timetuple())
@@ -19,6 +19,12 @@ def get_timeslot(time_point):
 
 def toTimeStmp(time_str):
     return time.mktime(datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S").timetuple())
+
+def get_day(time_str):
+    first_jan = get_timeslot_time('2016', '01', '01', 0)
+    curr = get_timeslot_time(time_str[:4], time_str[6:7], time_str[9:10], 0)
+    return int((curr - first_jan) / st.milli_sec_per_day)
+
 
 def toUTCtimestamp(dt, epoch=datetime(1970, 1, 1)):
     td = dt - epoch

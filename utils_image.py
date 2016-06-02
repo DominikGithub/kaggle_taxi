@@ -6,24 +6,24 @@ import time
 import statics as st
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-from utils_data import norm
+from utils_date import norm
 from utils_file import load
 from correlation_smoothing import interpolate_traffic
 
 def visualizations(interpolate_missing=False):
-    # visualize_orders(load(st.eval_dir+'demand.bin'), 'Demand', normalize=True)
-    # visualize_orders(load(st.eval_dir+'supply.bin'), 'Supply', normalize=True)
-    # visualize_orders(load(st.eval_dir+'gap.bin'), 'Gap', normalize=True)
-    # hist(load(st.eval_dir+'start_dist.bin'), 'Start_dist', y_range=[70, 180000])
-    # hist(load(st.eval_dir+'dest_dist.bin'), 'Dest_dist', y_range=[70, 120000])
-    #
-    # if interpolate_missing:
-    #     traffic_data = interpolate_traffic(53)
-    #     visualize_traffic(traffic_data, 'Traffic', normalize=True)
-    # else:
-    #     visualize_traffic(load(st.eval_dir + 'traffic.bin'), 'Traffic', normalize=True)
+    visualize_orders(load(st.eval_dir+'demand.bin'), 'Demand', normalize=True)
+    visualize_orders(load(st.eval_dir+'supply.bin'), 'Supply', normalize=True)
+    visualize_orders(load(st.eval_dir+'gap.bin'), 'Gap', normalize=True)
+    hist(load(st.eval_dir+'start_dist.bin'), 'Start_dist', y_range=[70, 180000])
+    hist(load(st.eval_dir+'dest_dist.bin'), 'Dest_dist', y_range=[70, 120000])
 
-    # visualize_weather(load(st.data_dir + 'weather.bin'), 'Weather', '(Weather, Temp, PM25)')
+    if interpolate_missing:
+        traffic_data = interpolate_traffic(53)
+        visualize_traffic(traffic_data, 'Traffic', normalize=True)
+    else:
+        visualize_traffic(load(st.eval_dir + 'traffic.bin'), 'Traffic', normalize=True)
+
+    visualize_weather(load(st.data_dir + 'weather.bin'), 'Weather', '(Weather, Temp, PM25)')
     visualize_pois(load(st.eval_dir + 'pois.bin'), 'Pois level 1')
     visualize(load(st.eval_dir + 'pois_simple.bin'), 'Pois level 1_simpel')
 

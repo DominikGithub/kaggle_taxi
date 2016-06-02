@@ -1,6 +1,7 @@
 #!/usr/bin/env /home/dominik/anaconda2/bin/python
 
 from sys import stdout
+import threading
 import logging
 import theano
 from learning_data_builder import Learning_data_builder
@@ -8,8 +9,9 @@ from mlp import mlp_train
 from data_container import IncMap, create_distr_Map
 from utils_file import *
 from utils_image import *
-from utils_data import norm, toUTCtimestamp, get_timeslot
+from utils_date import norm, toUTCtimestamp, get_timeslot
 from correlation_smoothing import smooth_weather_train, smooth_weather_test, interpolate_traffic
+from preprocessor import Preprocessor
 
 logging.basicConfig(filename='taxi.log', level=logging.INFO)
 
@@ -159,10 +161,7 @@ def preprocessing(date='*', interpolate_missing=False):
 def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
     save_timestmp = toUTCtimestamp(datetime.datetime.utcnow())
     pred_formatted = np.asarray([float('%.2f' % x) for x in data.tolist()]).reshape((st.n_districts, n_pred_tisl))
-
-    print 'min prediction: %f' % np.min(pred_formatted)
-
-    pred_formatted = pred_formatted-np.min(pred_formatted)      # TODO why is "-min" doing better???
+    # pred_formatted = pred_formatted-np.min(pred_formatted)
     visualize_prediction((pred_formatted), 'prediction', n_pred_tisl, save_timestmp)
     pred_shaped = data.reshape((st.n_districts, n_pred_tisl))
     print 'predictions: %s' % pred_formatted
@@ -181,6 +180,7 @@ def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
     print 'MAPE: %s' % MAPE
     logging.warn('MAPE: %s' % MAPE)
 
+    os.system('espeak "your program has finished"')
     logging.info('saved prediction to file: %s_%s.csv' % (st.eval_dir_test, save_timestmp))
     logging.info('saved prediction to file: %sprediction_%s.png' % (st.eval_dir_test, save_timestmp))
     save_predictions(prediction_times, pred_formatted, save_timestmp)
@@ -191,10 +191,8 @@ def train_nn(interpolate_missing=False):
     # gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_day()
     gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_week_day()
 
-    print 'min: %f max: %f' % (np.min(sample_train), np.max(sample_train))
-
-    # sample_test= norm(np.asarray(sample_test))
-    # sample_train = norm(np.asarray(sample_train))
+    sample_test= norm(np.asarray(sample_test))
+    sample_train = norm(np.asarray(sample_train))
     # gap_train = norm(np.asarray(gap_train))
     # gap_test = norm(np.asarray(gap_test))
 
@@ -204,7 +202,7 @@ def train_nn(interpolate_missing=False):
     va = [np.asarray(sample_train[-valid_size:]), np.asarray(gap_train[-valid_size:])]
     te = [np.asarray(sample_test), np.asarray(gap_test)]
 
-    classifier = mlp_train(logging, tr, va, te, add_L1_L2_regressor=False)
+    classifier = mlp_train(logging, tr, va, te, add_L1_L2_regressor=True)
 
     print '... prediction'
     predict_model = theano.function(
@@ -222,17 +220,23 @@ def train_nn(interpolate_missing=False):
 
     print 'predition # results: %s ' % prediction.shape
     prediction_postprocessing(prediction, gap, prediction_times, n_pred_tisl)
+    # diff_prediction_gap(gap, prediction)
+
+# def diff_prediction_gap(gap, prediction):
+    # visualize(gap.flatten()-prediction, 'gap vs prediction')
 
 if __name__ == "__main__":
     date = '2016-01-*'
+
+    Preprocessor()
     # preprocessing(date, interpolate_missing=False)
     # visualizations()
 
-    started_at = datetime.datetime.now()
-    logging.info('------')
-    logging.info('Started at: %s' % started_at)
-    print(started_at)
-    train_nn()
-    finished_at = datetime.datetime.now()
-    print(finished_at)
-    logging.info('Finished at: %s' % finished_at)
+    # started_at = datetime.datetime.now()
+    # logging.info('------')
+    # logging.info('Started at: %s' % started_at)
+    # print(started_at)
+    # train_nn()
+    # finished_at = datetime.datetime.now()
+    # print(finished_at)
+    # logging.info('Finished at: %s' % finished_at)

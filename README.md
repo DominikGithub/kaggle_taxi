@@ -30,7 +30,7 @@ This README would normally document whatever steps are necessary to get your app
 
 
 
-##### data file formats #####
+#### Data file formats ####
 weather: [21 x 3 x 144]=[days x types x timeslots]
 traffic:
 demand:

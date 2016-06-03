@@ -12,7 +12,7 @@ data_dir = 'data_train/'#data_dir_test
 eval_dir = data_dir+'evaluation/'
 eval_dir_test = data_dir_test+'evaluation/'
 
-n_train_days = 21   #5
+# n_train_days = 21   #5
 n_districts = 66   # 66 kown disctricts + unkonwn many unkonwn
 n_timeslots = 144
 
@@ -33,7 +33,6 @@ w_pm25 = 'pm25'
 w_temperature = 'temperature'
 
 order_keys = [order_id, driver_id, passenger_id, start_district_hash, dest_district_hash, price, time]
-traffic_keys = [tj_district_hash, tj_level, time]
 weather_keys = [time, w_weather, w_temperature, w_pm25]
 
 n_poi_first = 26

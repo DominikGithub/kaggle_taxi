@@ -59,10 +59,11 @@ def interpolate_traffic(district_idx):
         idx += 1
     return all_days
 
-def smooth_weather_train():
+def smooth_visualize_weather_train():
+    print 'smoothing weather training data ...'
+    name = 'weather_daywise'
     data = load(st.eval_dir+'weather.bin')
-    n_days = 21
-    name = 'weather'
+    n_days = 31
 
     fig, axarr = plt.subplots(n_days, 3, figsize=(20, 30))
     smoothed = np.ndarray((n_days, 3, 144))
@@ -75,7 +76,8 @@ def smooth_weather_train():
             outlier = outlier.interpolate(method='pchip')
 
             df = pd.DataFrame(outlier)
-            smoothed[day, objective, :] = df.rolling(window=4, center=True).median().fillna(0).values.flatten()
+            temp = df.rolling(window=4, center=True).median().fillna(0).values.flatten()
+            smoothed[day, objective, :] = temp
 
         axarr[day, 0].set_xticks(xrange(0, 144, 11))
         axarr[day, 0].plot(smoothed[day, 0], color='green')
@@ -87,15 +89,16 @@ def smooth_weather_train():
     save(st.eval_dir+name, smoothed)
 
     fig.suptitle('Weather, Temp, PM25', fontsize=20)
-    plt.savefig(name+'.png')
+    plt.savefig(st.eval_dir+name+'.png')
     plt.close()
 
-def smooth_weather_test():
-    data = load(st.eval_dir_test+'weather.bin')
-    n_days = 5
-    name = 'weather_test'
+def smooth_visualize_weather_test():
+    print 'smoothing weather test data ...'
+    name = 'weather_daywise_test'
+    data = load(st.eval_dir_test+'weather'+'.bin')
+    n_days = 31
 
-    fig, axarr = plt.subplots(n_days, 3, figsize=(20, 10))
+    fig, axarr = plt.subplots(n_days, 3, figsize=(20, 30))
     smoothed = np.ndarray((n_days, 3, 144))
     for day in range(n_days):
         for objective in range(0, 3):
@@ -110,16 +113,15 @@ def smooth_weather_test():
         axarr[day, 2].set_xticks(xrange(0, 144, 11))
         axarr[day, 2].plot(smoothed[day, 2], color='blue')
 
-    save(st.eval_dir+name, smoothed)
+    save(st.eval_dir_test+name, smoothed)
 
     fig.suptitle('Weather, Temp, PM25', fontsize=20)
-    plt.savefig(name+'.png')
+    plt.savefig(st.eval_dir_test+name+'.png')
     plt.close()
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
     # name = 'weather.bin'
     # weather_correlation(st.eval_dir+name)
-    smooth_weather_train()
-    smooth_weather_test()
-
+    # smooth_weather_train()
+    # smooth_weather_test()
     # visualize_weather(data, 'Weather', '(Weather, Temp, PM25)')

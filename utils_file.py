@@ -35,15 +35,6 @@ def load_test_data():
     date = '*'
     traffic_jam = merge_files(glob.glob(st.data_dir + 'traffic_data_'+date))
 
-# def hist(x):
-#     colors = ['red']    #, 'tan', 'lime'
-#     n, bins, patches = plt.hist(x, 144, normed=False)#, color=colors
-#     plt.xlabel('thing')
-#     plt.ylabel('count')
-#     # plt.axis([0, 15, 0, 1])
-#     plt.grid(True)
-#     plt.show()
-
 def load(filename):
     fileDir = os.path.dirname(os.path.realpath('__file__'))
     filename = os.path.join(fileDir, filename)

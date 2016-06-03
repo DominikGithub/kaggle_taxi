@@ -36,8 +36,6 @@ def visualize(data, title, normalize=False):
         print 'sci-learn scaling used in utils_image.visualization....'
         data = preprocessing.scale(data)
 
-
-
     plt.imshow(data.transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, 24])
     axes = plt.gca()
     axes.set_xticks(xrange(0, st.n_districts+1, 11))
@@ -97,14 +95,16 @@ def visualize_prediction(data, title, n_time_slots, timestmp, normalize=False):
 
 def visualize_traffic(data, title, normalize=False):
     print 'plotting %s' % title
-    fig = plt.figure(figsize=(30, 20))
+    fig = plt.figure(figsize=(40, 60))
+    plt.ioff()
     idx = 0
-    for day in range(7):
+    n_days = data.shape[0]
+    for day in range(n_days):
         for lvl in range(st.max_congestion_lvls):
-            ax2 = plt.subplot2grid((7, st.max_congestion_lvls), (day, lvl))
+            ax2 = plt.subplot2grid((n_days, st.max_congestion_lvls), (day, lvl))
             # if normalize:   dat = norm(data[:,:,idx])
             # else:           dat = data[:,:,idx]
-            ax2.imshow(data[day].transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, 24])
+            ax2.imshow(data[day, :,:, lvl].transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, 24])
             axes = plt.gca()
             axes.set_xticks(xrange(0, st.n_districts + 1, 11))
             axes.set_yticks(xrange(0, 25, 6))
@@ -120,13 +120,13 @@ def visualize_orders(data, title, normalize=False):
     print 'plotting %s' % title
     n_days = data.shape[0]
 
-    # fig = plt.figure(figsize=(5, 18))
+    plt.ioff()
     fig = plt.figure(figsize=(15, 54))
     for day in range(n_days):
         ax2 = plt.subplot2grid((n_days, 1), (day, 0))
         # if normalize:   dat = norm(data[day,:])
         # else:           dat = data[day,:]
-        ax2.imshow(data.transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, 24])
+        ax2.imshow(data[day].transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, 24])
         axes = plt.gca()
         axes.set_xticks(xrange(0, st.n_districts + 1, 11))
         axes.set_yticks(xrange(0, 25, 6))
@@ -153,7 +153,7 @@ def visualize_weather(data, name, title):
 
 def hist(data, title, y_range=None):
     print 'plotting %s' % title
-    fig = plt.figure(figsize=(40, 10))
+    fig = plt.figure(figsize=(60, 10))
     # n, bins, patches = plt.hist(data)
 
     n_days = data.shape[0]

@@ -9,7 +9,7 @@ from data_container import IncMap, create_distr_Map
 from utils_file import *
 from utils_image import *
 from utils_date import *
-from correlation_smoothing import smooth_weather_train, smooth_weather_test, interpolate_traffic
+from correlation_smoothing import smooth_visualize_weather_train, smooth_visualize_weather_test, interpolate_traffic
 from preprocessor import Preprocessor
 
 logging.basicConfig(filename='taxi.log', level=logging.INFO)
@@ -110,8 +110,8 @@ def preprocess_weather(date):
             weather_mat[day_idx-1][tslot_idx] = [w_weather, w_temp, w_pm25]
 
     save(st.eval_dir+'weather', weather_mat)
-    smooth_weather_train()
-    smooth_weather_test()
+    smooth_visualize_weather_train()
+    smooth_visualize_weather_test()
 
 def poi_map_recursive(ndarray, keys, value, lvl):
     if len(keys) > 1:
@@ -151,11 +151,11 @@ def preprocess_pois():
     save(st.eval_dir+'pois', poi_map)
 
 def preprocessing(date='*', interpolate_missing=False):
-    logging.info('Running preprocessing for: %s' % date)
-    preprocess_pois()
+    # logging.info('Running preprocessing for: %s' % date)
+    # preprocess_pois()
     preprocess_weather(date)
-    preprocess_traffic(date, interpolate_missing)
-    preprocess_orders(date)
+    # preprocess_traffic(date, interpolate_missing)
+    # preprocess_orders(date)
 
 def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
     save_timestmp = toUTCtimestamp(datetime.utcnow())
@@ -184,11 +184,13 @@ def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
     logging.info('saved prediction to file: %sprediction_%s.png' % (st.eval_dir_test, save_timestmp))
     save_predictions(prediction_times, pred_formatted, save_timestmp)
 
+    print '(float) MAPE: %f' % MAPE
+
 def train_nn(interpolate_missing=False):
     mape_factor_active = False
     builder = Learning_data_builder()
-    # gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_day()
-    gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_week_day()
+    gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_day()
+    # gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_week_day()
 
     valid_size = 10000
     tr = [np.asarray(sample_train[:-valid_size]), np.asarray(gap_train[:-valid_size])]
@@ -214,8 +216,8 @@ def train_nn(interpolate_missing=False):
 
     print 'predition # results: %s ' % prediction.shape
     prediction_postprocessing(prediction, gap, prediction_times, n_pred_tisl)
-    # diff_prediction_gap(gap, prediction)
 
+    # diff_prediction_gap(gap, prediction)
 # def diff_prediction_gap(gap, prediction):
     # visualize(gap.flatten()-prediction, 'gap vs prediction')
 

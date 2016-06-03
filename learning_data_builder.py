@@ -1,9 +1,12 @@
 #!/usr/bin/env /home/dominik/anaconda2/bin/python
 
+import numpy as np
 import math
 import datetime
+import theano
+import theano.tensor as T
+from theano import function as tfunc
 from utils_file import *
-from utils_data import norm
 import statics as st
 
 class Learning_data_builder(object):
@@ -40,8 +43,54 @@ class Learning_data_builder(object):
         # self.pois = load(st.eval_dir+'pois.bin')
         self.pois = load(st.eval_dir + 'pois_simple.bin')
 
+    def normalize(self, data):
+        eps_norm = 1
+        print('... normalize input (calculating statistics)')
+        data = np.asarray(data)
+        # if not hasattr(self, 'means'):
+        self.means = data.mean(axis=1, keepdims=True)
+        # else:
+        #     print '... normalizing using precalculated statistics'
+        # if not hasattr(self, 'x_mean'):
+        self.x_mean = data - self.means
+        # if not hasattr(self, 'variance'):
+        self.variance = np.var(data, axis=1, keepdims=False)
+        return self.x_mean / (np.sqrt(self.variance + eps_norm))[:, np.newaxis]
+
+    def whiten(self, data):
+        print('... whiten input')
+        cov = T.matrix('cov', dtype=theano.config.floatX)
+        eig_vals, eig_vecs = tfunc([cov], T.nlinalg.eig(cov), allow_input_downcast=True)(np.cov(data))
+        x = T.matrix('x')
+        vc = T.matrix('vc')
+        mat_inv = T.matrix('mat_inv')
+        np_eps = 0.1 * np.eye(eig_vals.shape[0])
+
+        sqr_inv = np.linalg.inv(np.sqrt(np.diag(eig_vals) + np_eps))
+        whitening = T.dot(T.dot(T.dot(vc, mat_inv), vc.T), x)
+        zca = tfunc([x, vc, mat_inv], whitening, allow_input_downcast=True)
+        return zca(data, eig_vecs, sqr_inv)
+
     def build_training_data_per_day(self):
-        pass
+        pred_timeslots = [x.split('-')[3] for x in self.prediction_times]
+        n_pred_tisl = len(pred_timeslots)
+
+        samples_train = []
+        gap_train = []
+        # for d in range(st.n_districts):
+        #     for week_day in range(7):
+
+
+        samples_test = []
+        gap_test = []
+        # for d in range(st.n_districts):
+        #     for dtime_slt in range(n_pred_tisl):
+
+        # samples_train = self.normalize(samples_train).transpose()
+        # samples_train = self.whiten(samples_train).transpose()
+        # samples_test = self.normalize(samples_test).transpose()
+        # samples_test = self.whiten(samples_test).transpose()
+        # return self.gap_train, samples_train, samples_test, gap_train, gap_test, self.prediction_times, n_pred_tisl
 
     def build_training_data_per_week_day(self):
         pred_timeslots = [x.split('-')[3] for x in self.prediction_times]
@@ -58,8 +107,8 @@ class Learning_data_builder(object):
                     if math.isnan(supp):  supp = self.supply_train[week_day, d, dtime_slt]
                     params = [week_day, dtime_slt, dem, supp]
                     samples_train.append(np.concatenate((params,
-                                                        norm(self.traffic_train[week_day, d, dtime_slt, :].flatten(), axis=0),
-                                                        norm(self.pois[d].flatten(), axis=0),
+                                                        self.traffic_train[week_day, d, dtime_slt, :].flatten(),
+                                                        self.pois[d].flatten(),
                                                         self.destination_train[week_day, d].flatten(),
                                                         self.start_train[week_day, d].flatten()
                                                         # ,
@@ -78,14 +127,21 @@ class Learning_data_builder(object):
                 if math.isnan(supp):  supp = self.supply_train[week_day, d, dtime_slt]
                 params = [week_day, dtime_slt, dem, supp]
                 samples_test.append(np.concatenate((params,
-                                                    norm(self.traffic_test[week_day, d, dtime_slt, :].flatten(), axis=0),
-                                                    norm(self.pois[d].flatten(), axis=0),
+                                                    self.traffic_test[week_day, d, dtime_slt, :].flatten(),
+                                                    self.pois[d].flatten(),
                                                     self.destination_test[week_day, d].flatten(),
                                                     self.start_test[week_day, d].flatten()
                                                     # ,
                                                     # self.weather_test[day, dtime_slt,:].flatten()
                                                     ), axis=0))
                 gap_test.append(self.gap_test[week_day, d, dtime_slt])
+
+        samples_train = self.normalize(samples_train).transpose()
+        samples_train = self.whiten(samples_train).transpose()
+
+        samples_test = self.normalize(samples_test).transpose()
+        samples_test = self.whiten(samples_test).transpose()
+
         return self.gap_train, samples_train, samples_test, gap_train, gap_test, self.prediction_times, n_pred_tisl
 
     # def load_pred_times(self):

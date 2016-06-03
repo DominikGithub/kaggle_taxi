@@ -11,7 +11,15 @@ class Preprocessor(object):
     file_postfix = '_daywise'
 
     def __init__(self, interpolate_missing=False):
-        self.process_orders_day_wise(date='2016-01-2*')
+        self.process_orders_day_wise(date='2016-01-*')
+
+        print 'visualizing data'
+        visualize_orders(load(st.eval_dir + 'demand'+self.file_postfix+'.bin'), 'Demand'+self.file_postfix, normalize=True)
+        visualize_orders(load(st.eval_dir + 'supply'+self.file_postfix+'.bin'), 'Supply'+self.file_postfix, normalize=True)
+        visualize_orders(load(st.eval_dir + 'gap'+self.file_postfix+'.bin'), 'Gap'+self.file_postfix, normalize=True)
+        hist(load(st.eval_dir + 'start_dist'+self.file_postfix+'.bin'), 'Start_dist'+self.file_postfix, y_range=[70, 180000])
+        hist(load(st.eval_dir + 'dest_dist'+self.file_postfix+'.bin'), 'Dest_dist'+self.file_postfix, y_range=[70, 120000])
+        os.system('espeak "Preprocessing has finished"')
 
     def process_orders_day_wise(self, date):
         print 'preprocessing orders'
@@ -21,6 +29,11 @@ class Preprocessor(object):
 
         file_list = glob.glob(st.data_dir + 'order_data_' + date)
         n_days = len(file_list)
+        for file_name in file_list:
+            day = get_day(file_name[-10:])  # set 15 for test data
+            if n_days < day:
+                n_days = day
+        n_days += 1
         orders = merge_files(file_list)
 
         supply      = np.zeros(shape=(n_days, st.n_districts, st.n_timeslots))
@@ -57,8 +70,8 @@ class Preprocessor(object):
 
         print '\r'
         save(st.eval_dir + 'gap'+self.file_postfix, gap)
-        save(st.eval_dir + 'demand'+self.file_postfix, norm(demand))    # TODO normalize here?
-        save(st.eval_dir + 'supply'+self.file_postfix, norm(supply))
+        save(st.eval_dir + 'demand'+self.file_postfix, demand)
+        save(st.eval_dir + 'supply'+self.file_postfix, supply)
 
         save(st.eval_dir + 'start_dist'+self.file_postfix, start_dist)
         save(st.eval_dir + 'dest_dist'+self.file_postfix, dest_dist)

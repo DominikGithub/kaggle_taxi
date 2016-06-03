@@ -6,7 +6,8 @@ import time
 import statics as st
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-from utils_date import norm
+# from utils_date import norm
+from sklearn import preprocessing
 from utils_file import load
 from correlation_smoothing import interpolate_traffic
 
@@ -30,7 +31,12 @@ def visualizations(interpolate_missing=False):
 def visualize(data, title, normalize=False):
     print 'plotting %s' % title
 
-    if normalize: data = norm(data)
+    if normalize:
+        # data = norm(data)
+        print 'sci-learn scaling used in utils_image.visualization....'
+        data = preprocessing.scale(data)
+
+
 
     plt.imshow(data.transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, 24])
     axes = plt.gca()
@@ -73,7 +79,10 @@ def visualize_correlation(data, title):
 def visualize_prediction(data, title, n_time_slots, timestmp, normalize=False):
     print 'plotting %s' % title
 
-    if normalize: data = norm(data)
+    if normalize:
+        # data = norm(data)
+        print 'sci-learn scaling used in utils_image....'
+        data = preprocessing.scale(data)
 
     plt.imshow(data.transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, n_time_slots])
     axes = plt.gca()
@@ -93,9 +102,9 @@ def visualize_traffic(data, title, normalize=False):
     for day in range(7):
         for lvl in range(st.max_congestion_lvls):
             ax2 = plt.subplot2grid((7, st.max_congestion_lvls), (day, lvl))
-            if normalize:   dat = norm(data[:,:,idx])
-            else:           dat = data[:,:,idx]
-            ax2.imshow(dat[day].transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, 24])
+            # if normalize:   dat = norm(data[:,:,idx])
+            # else:           dat = data[:,:,idx]
+            ax2.imshow(data[day].transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, 24])
             axes = plt.gca()
             axes.set_xticks(xrange(0, st.n_districts + 1, 11))
             axes.set_yticks(xrange(0, 25, 6))
@@ -109,12 +118,15 @@ def visualize_traffic(data, title, normalize=False):
 
 def visualize_orders(data, title, normalize=False):
     print 'plotting %s' % title
-    fig = plt.figure(figsize=(5, 18))
-    for day in range(7):
-        ax2 = plt.subplot2grid((7, 1), (day, 0))
-        if normalize:   dat = norm(data[day,:])
-        else:           dat = data[day,:]
-        ax2.imshow(dat.transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, 24])
+    n_days = data.shape[0]
+
+    # fig = plt.figure(figsize=(5, 18))
+    fig = plt.figure(figsize=(15, 54))
+    for day in range(n_days):
+        ax2 = plt.subplot2grid((n_days, 1), (day, 0))
+        # if normalize:   dat = norm(data[day,:])
+        # else:           dat = data[day,:]
+        ax2.imshow(data.transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, 24])
         axes = plt.gca()
         axes.set_xticks(xrange(0, st.n_districts + 1, 11))
         axes.set_yticks(xrange(0, 25, 6))
@@ -144,11 +156,12 @@ def hist(data, title, y_range=None):
     fig = plt.figure(figsize=(40, 10))
     # n, bins, patches = plt.hist(data)
 
+    n_days = data.shape[0]
     error_config = {'ecolor': '0.3'}
     bar_width = 0.5
     for mode in range(2):
-        for day in range(7):
-            plt.subplot2grid((2,7), (mode, day))
+        for day in range(n_days):
+            plt.subplot2grid((2,n_days), (mode, day))
             dat = data[day,:]
             index = np.arange(len(dat))
             if y_range and mode==1:

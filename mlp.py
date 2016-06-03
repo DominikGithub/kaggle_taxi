@@ -75,38 +75,38 @@ class MLP(object):
             activation=activ_func
         )
 
-        self.hiddenLayer2 = HiddenLayer(
-            rng=rng,
-            input=self.hiddenLayer1.output,
-            n_in=n_hidden,
-            n_out=n_hidden,
-            W=W_hidden2,
-            b=b_hidden2,
-            activation=activ_func
-        )
+        # self.hiddenLayer2 = HiddenLayer(
+        #     rng=rng,
+        #     input=self.hiddenLayer1.output,
+        #     n_in=n_hidden,
+        #     n_out=n_hidden,
+        #     W=W_hidden2,
+        #     b=b_hidden2,
+        #     activation=activ_func
+        # )
 
         self.outputLayer = LinearRegression(
-            # input=self.hiddenLayer1.output,
-            input = self.hiddenLayer2.output,
+            input=self.hiddenLayer1.output,
+            # input = self.hiddenLayer2.output,
             W=W_log,
             b=b_log
         )
 
         self.L1 = (
             abs(self.hiddenLayer1.W).sum()
-            + abs(self.hiddenLayer2.W).sum()
+            # + abs(self.hiddenLayer2.W).sum()
             + abs(self.outputLayer.W).sum()
         )
 
         self.L2_sqr = (
               (self.hiddenLayer1.W ** 2).sum()
-            + (self.hiddenLayer2.W ** 2).sum()
+            # + (self.hiddenLayer2.W ** 2).sum()
             + (self.outputLayer.W ** 2).sum()
         )
 
         self.errors = self.outputLayer.errors
         self.y_pred = self.outputLayer.y_pred
-        self.params = self.hiddenLayer1.params + self.hiddenLayer2.params + self.outputLayer.params
+        self.params = self.hiddenLayer1.params + self.outputLayer.params    # + self.hiddenLayer2.params
         self.input = input
 
 def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor=False):
@@ -114,25 +114,24 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     valid_set_x, valid_set_y = data_validate
     test_set_x, test_set_y = data_test
 
-    batch_size = 18000
+    batch_size = 17000
     n_in = train_set_x.shape[1]
     n_out = batch_size
-    n_hidden = 40
-    n_epochs = 10
-    opt_name = 'Adadelta'   # 'RmsProp' #'GradientDescent'
+    n_hidden = 200
+    n_epochs = 50
+    opt_name = 'Adadelta'   #'RmsProp'   # 'GradientDescent'
     active_func_name = 'Rectified linear unit'  #'tanh'
     n_train_batches = train_set_x.shape[0] // batch_size
     print 'training %i epochs' % n_epochs
 
     rng = np.random.RandomState(1234)
-    tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_hidden), n_hidden,(n_hidden, n_out), n_out]
-    wrt_flat, (Weights_hidden1, bias_hidden1, Weights_hidden2, bias_hidden2, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
-    # tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_out), n_out]
-    # wrt_flat, (Weights_hidden1, bias_hidden1, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
+    # tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_hidden), n_hidden,(n_hidden, n_out), n_out]
+    # wrt_flat, (Weights_hidden1, bias_hidden1, Weights_hidden2, bias_hidden2, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
+    tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_out), n_out]
+    wrt_flat, (Weights_hidden1, bias_hidden1, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
     climin.initialize.randomize_normal(wrt_flat, 0, 0.01)
 
     print 'tmpl: %s ' % tmpl
-
     logging.info('Batch size: %s' % batch_size)
     logging.info('Hidden layer: %s' % n_hidden)
     logging.info('Epochs: %s' % n_epochs)
@@ -152,8 +151,8 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
         active_func_name=active_func_name,
         W_hidden1 = theano.shared(value=Weights_hidden1, name='Wh', borrow=True),
         b_hidden1 = theano.shared(value=bias_hidden1, name='bh', borrow=True),
-        W_hidden2=theano.shared(value=Weights_hidden2, name='Wh', borrow=True),
-        b_hidden2=theano.shared(value=bias_hidden2, name='bh', borrow=True),
+        # W_hidden2=theano.shared(value=Weights_hidden2, name='Wh', borrow=True),
+        # b_hidden2=theano.shared(value=bias_hidden2, name='bh', borrow=True),
         W_log = theano.shared(value=Weights_log, name='Wo', borrow=True),
         b_log = theano.shared(value=bias_log, name='bo', borrow=True)
     )
@@ -166,6 +165,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
                    + L2_reg * classifier.L2_sqr
         )
         logging.info('Loss L1/L2 regressor L1: %s L2: %s' % (L1_reg, L2_reg))
+        # logging.info('Loss L2 regressor L2: %s' % (L2_reg))
     else:
         cost_reg = classifier.errors(y)
         logging.info('Loss L1/L2 regressor: None')
@@ -183,10 +183,10 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     )
 
     def d_loss_wrt_pars(parameters, inputs, targets):
-        g_W_h, g_b_h, g_W_h2, g_b_h2, g_W_l, g_b_l = gradients(inputs, targets)
-        return np.concatenate([g_W_h.flatten(), g_b_h, g_W_h2.flatten(), g_b_h2, g_W_l.flatten(), g_b_l])
-        # g_W_h, g_b_h, g_W_l, g_b_l = gradients(inputs, targets)
-        # return np.concatenate([g_W_h.flatten(), g_b_h, g_W_l.flatten(), g_b_l])
+        # g_W_h, g_b_h, g_W_h2, g_b_h2, g_W_l, g_b_l = gradients(inputs, targets)
+        # return np.concatenate([g_W_h.flatten(), g_b_h, g_W_h2.flatten(), g_b_h2, g_W_l.flatten(), g_b_l])
+        g_W_h, g_b_h, g_W_l, g_b_l = gradients(inputs, targets)
+        return np.concatenate([g_W_h.flatten(), g_b_h, g_W_l.flatten(), g_b_l])
 
     zero_one_loss = theano.function(
         inputs = [x, y],
@@ -227,7 +227,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
         opt = climin.GradientDescent(wrt_flat, d_loss_wrt_pars, step_rate=step, momentum=momentum, args=args)
         logging.info('GradientDescent step rate: %s, momentum %s' % (step, momentum))
     elif opt_name == 'RmsProp':
-        step = 1e-5
+        step = 1e-4
         dec = 0.9
         opt = climin.RmsProp(wrt_flat, d_loss_wrt_pars, step_rate=step, decay=dec, args=args)
         logging.info('RmsProp step rate: %s, decay %s' % (step, dec))

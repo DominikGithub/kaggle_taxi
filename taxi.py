@@ -1,7 +1,6 @@
 #!/usr/bin/env /home/dominik/anaconda2/bin/python
 
 from sys import stdout
-import threading
 import logging
 import theano
 from learning_data_builder import Learning_data_builder
@@ -9,7 +8,7 @@ from mlp import mlp_train
 from data_container import IncMap, create_distr_Map
 from utils_file import *
 from utils_image import *
-from utils_date import norm, toUTCtimestamp, get_timeslot
+from utils_date import *
 from correlation_smoothing import smooth_weather_train, smooth_weather_test, interpolate_traffic
 from preprocessor import Preprocessor
 
@@ -24,9 +23,9 @@ def preprocess_traffic(date, interpolate_missing=False):
         traffic_data = load_csv(traffic_file)
 
         if st.data_dir == 'data_train/':
-            week_day = datetime.datetime.strptime(traffic_file[-10:], '%Y-%m-%d').weekday()
+            week_day = datetime.strptime(traffic_file[-10:], '%Y-%m-%d').weekday()
         else:
-            week_day = datetime.datetime.strptime(traffic_file[-10-st.cut_off_test:-st.cut_off_test], '%Y-%m-%d').weekday()
+            week_day = datetime.strptime(traffic_file[-10-st.cut_off_test:-st.cut_off_test], '%Y-%m-%d').weekday()
 
         for sing_traf in traffic_data:
             distr_hash = sing_traf[0]
@@ -68,7 +67,7 @@ def preprocess_orders(date):
 
         s_distr_idx = int(dist_map.getkey_or_create(order[st.start_district_hash]))-1
         d_distr_idx = int(dist_map.getkey_or_create(order[st.dest_district_hash]))-1
-        week_day = datetime.datetime.strptime(order[st.time], '%Y-%m-%d %H:%M:%S').weekday()
+        week_day = datetime.strptime(order[st.time], '%Y-%m-%d %H:%M:%S').weekday()
         tslot_idx = int(get_timeslot(order[st.time]))
 
         if order[st.driver_id] == 'NULL':
@@ -83,8 +82,8 @@ def preprocess_orders(date):
     print '\r'
     # orders = whiten(orders)
     save(st.eval_dir+'gap', gap)
-    save(st.eval_dir+'demand', norm(demand))
-    save(st.eval_dir+'supply', norm(supply))
+    save(st.eval_dir+'demand', demand)
+    save(st.eval_dir+'supply', supply)
 
     save(st.eval_dir+'start_dist', start_dist)
     save(st.eval_dir+'dest_dist', dest_dist)
@@ -97,9 +96,9 @@ def preprocess_weather(date):
         w_data = load_csv(w_file)
 
         # if st.data_dir == 'data_train/':
-        #     week_day = datetime.datetime.strptime(w_file[-10:], '%Y-%m-%d').weekday()
+        #     week_day = datetime.strptime(w_file[-10:], '%Y-%m-%d').weekday()
         # else:
-        #     week_day = datetime.datetime.strptime(w_file[-10-st.cut_off_test:-st.cut_off_test], '%Y-%m-%d').weekday()
+        #     week_day = datetime.strptime(w_file[-10-st.cut_off_test:-st.cut_off_test], '%Y-%m-%d').weekday()
 
         for sing_w in w_data:
             w_dict = dict(zip(st.weather_keys, sing_w))
@@ -119,13 +118,13 @@ def poi_map_recursive(ndarray, keys, value, lvl):
         ndarray[keys[0]] = poi_map_recursive(ndarray[keys[0]], keys[1:], value, lvl+1)
         return ndarray
     if len(keys) == 1:
-        ndarray[keys] = value
+        ndarray[keys[0]] = value
     return ndarray
 
 def preprocess_pois():
     print 'preprocessing pois'
     dist_map = create_distr_Map()
-    poi_map = np.zeros(shape=(st.n_districts, st.n_poi_first, st.n_poi_second))
+    poi_map = np.zeros(shape=(st.n_districts, st.n_poi_first, st.n_poi_second, st.n_poi_third))
     poi_map_simple = np.zeros(shape=(int(st.n_districts), int(st.n_poi_first)))
     pois = merge_files(glob.glob(st.data_dir+'poi_data'))
     for entry in pois:
@@ -146,10 +145,10 @@ def preprocess_pois():
                 keys = [distr_idx]+classes
                 poi_map_recursive(poi_map, keys, int(num), 0)
             except:
-                raise Exception('class level outside poi_map size: %s' % p)
+                raise Exception('class level outside poi_map size: %s' % p) #9#1#1:14
 
-    save(st.eval_dir+'pois_simple', norm(poi_map_simple))
-    save(st.eval_dir+'pois', norm(poi_map))
+    save(st.eval_dir+'pois_simple', poi_map_simple)
+    save(st.eval_dir+'pois', poi_map)
 
 def preprocessing(date='*', interpolate_missing=False):
     logging.info('Running preprocessing for: %s' % date)
@@ -159,7 +158,7 @@ def preprocessing(date='*', interpolate_missing=False):
     preprocess_orders(date)
 
 def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
-    save_timestmp = toUTCtimestamp(datetime.datetime.utcnow())
+    save_timestmp = toUTCtimestamp(datetime.utcnow())
     pred_formatted = np.asarray([float('%.2f' % x) for x in data.tolist()]).reshape((st.n_districts, n_pred_tisl))
     # pred_formatted = pred_formatted-np.min(pred_formatted)
     visualize_prediction((pred_formatted), 'prediction', n_pred_tisl, save_timestmp)
@@ -170,7 +169,7 @@ def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
     timeslots = [x.split('-')[3] for x in prediction_times]
     gap_subset = np.ndarray((7, st.n_districts, n_pred_tisl))
     for tsl_idx, tslot in enumerate([int(t) for t in timeslots]):
-        week_day = datetime.datetime.strptime(prediction_times[tsl_idx][:10], '%Y-%m-%d').weekday()
+        week_day = datetime.strptime(prediction_times[tsl_idx][:10], '%Y-%m-%d').weekday()
         gap_subset[week_day, :,tsl_idx] = gap[week_day,:,tslot]
 
     gap_subset = np.mean(gap_subset, axis=0)
@@ -190,11 +189,6 @@ def train_nn(interpolate_missing=False):
     builder = Learning_data_builder()
     # gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_day()
     gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_week_day()
-
-    sample_test= norm(np.asarray(sample_test))
-    sample_train = norm(np.asarray(sample_train))
-    # gap_train = norm(np.asarray(gap_train))
-    # gap_test = norm(np.asarray(gap_test))
 
     valid_size = 10000
     tr = [np.asarray(sample_train[:-valid_size]), np.asarray(gap_train[:-valid_size])]
@@ -228,15 +222,15 @@ def train_nn(interpolate_missing=False):
 if __name__ == "__main__":
     date = '2016-01-*'
 
-    Preprocessor()
+    # Preprocessor()
     # preprocessing(date, interpolate_missing=False)
     # visualizations()
 
-    # started_at = datetime.datetime.now()
-    # logging.info('------')
-    # logging.info('Started at: %s' % started_at)
-    # print(started_at)
-    # train_nn()
-    # finished_at = datetime.datetime.now()
-    # print(finished_at)
-    # logging.info('Finished at: %s' % finished_at)
+    started_at = datetime.now()
+    logging.info('------')
+    logging.info('Started at: %s' % started_at)
+    print(started_at)
+    train_nn()
+    finished_at = datetime.now()
+    print(finished_at)
+    logging.info('Finished at: %s' % finished_at)

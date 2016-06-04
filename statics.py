@@ -34,6 +34,7 @@ w_temperature = 'temperature'
 
 order_keys = [order_id, driver_id, passenger_id, start_district_hash, dest_district_hash, price, time]
 weather_keys = [time, w_weather, w_temperature, w_pm25]
+prediction_keys = ['year', 'month', 'day', 'timeslot']
 
 n_poi_first = 26
 n_poi_second = 19

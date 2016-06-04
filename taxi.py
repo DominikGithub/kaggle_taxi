@@ -151,48 +151,46 @@ def preprocess_pois():
     save(st.eval_dir+'pois', poi_map)
 
 def preprocessing(date='*', interpolate_missing=False):
-    # logging.info('Running preprocessing for: %s' % date)
-    # preprocess_pois()
+    logging.info('Running preprocessing for: %s' % date)
+    preprocess_pois()
     preprocess_weather(date)
-    # preprocess_traffic(date, interpolate_missing)
-    # preprocess_orders(date)
+    preprocess_traffic(date, interpolate_missing)
+    preprocess_orders(date)
 
 def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
     save_timestmp = toUTCtimestamp(datetime.utcnow())
     pred_formatted = np.asarray([float('%.2f' % x) for x in data.tolist()]).reshape((st.n_districts, n_pred_tisl))
-    # pred_formatted = pred_formatted-np.min(pred_formatted)
+    save_predictions(prediction_times, pred_formatted, save_timestmp)
     visualize_prediction((pred_formatted), 'prediction', n_pred_tisl, save_timestmp)
     pred_shaped = data.reshape((st.n_districts, n_pred_tisl))
     print 'predictions: %s' % pred_formatted
     print 'gap:         %s' % gap.flatten()
 
-    timeslots = [x.split('-')[3] for x in prediction_times]
-    gap_subset = np.ndarray((7, st.n_districts, n_pred_tisl))
-    for tsl_idx, tslot in enumerate([int(t) for t in timeslots]):
-        week_day = datetime.strptime(prediction_times[tsl_idx][:10], '%Y-%m-%d').weekday()
-        gap_subset[week_day, :,tsl_idx] = gap[week_day,:,tslot]
+    # timeslots = [x.split('-')[3] for x in prediction_times]
+    # gap_subset = np.ndarray((7, st.n_districts, n_pred_tisl))
+    # for tsl_idx, tslot in enumerate([int(t) for t in timeslots]):
+    #     week_day = datetime.strptime(prediction_times[tsl_idx][:10], '%Y-%m-%d').weekday()
+    #     gap_subset[week_day, :,tsl_idx] = gap[week_day,:,tslot]
+    #
+    # gap_subset = np.mean(gap_subset, axis=0)
+    # gap_inv = np.linalg.inv(np.dot(gap_subset.transpose(), gap_subset))
+    # MAPE = np.sum(np.sum( np.abs(np.dot((gap_subset-pred_shaped), gap_inv)) )/n_pred_tisl )/st.n_districts
 
-    gap_subset = np.mean(gap_subset, axis=0)
-    gap_inv = np.linalg.inv(np.dot(gap_subset.transpose(), gap_subset))
-    MAPE = np.sum(np.sum( np.abs(np.dot((gap_subset-pred_shaped), gap_inv)) )/n_pred_tisl )/st.n_districts
+    # print 'MAPE: %s' % MAPE
+    # logging.warn('MAPE: %s' % MAPE)
 
-    print 'MAPE: %s' % MAPE
-    logging.warn('MAPE: %s' % MAPE)
-
-    os.system('espeak "your program has finished"')
     logging.info('saved prediction to file: %s_%s.csv' % (st.eval_dir_test, save_timestmp))
     logging.info('saved prediction to file: %sprediction_%s.png' % (st.eval_dir_test, save_timestmp))
-    save_predictions(prediction_times, pred_formatted, save_timestmp)
-
-    print '(float) MAPE: %f' % MAPE
+    os.system('espeak "your program has finished"')
 
 def train_nn(interpolate_missing=False):
     mape_factor_active = False
-    builder = Learning_data_builder()
-    gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_day()
+    builder = Learning_data_builder(logging)
+    sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_day()
     # gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_week_day()
 
-    valid_size = 10000
+    valid_size = len(sample_train) *0.3  #10000
+    print 'valid_size: %s' % valid_size
     tr = [np.asarray(sample_train[:-valid_size]), np.asarray(gap_train[:-valid_size])]
     print 'train: %s  %s'  % (tr[0].shape, tr[1].shape)
     va = [np.asarray(sample_train[-valid_size:]), np.asarray(gap_train[-valid_size:])]
@@ -215,7 +213,7 @@ def train_nn(interpolate_missing=False):
 
 
     print 'predition # results: %s ' % prediction.shape
-    prediction_postprocessing(prediction, gap, prediction_times, n_pred_tisl)
+    prediction_postprocessing(prediction, np.asarray(gap_test), prediction_times, n_pred_tisl)
 
     # diff_prediction_gap(gap, prediction)
 # def diff_prediction_gap(gap, prediction):
@@ -225,14 +223,5 @@ if __name__ == "__main__":
     date = '2016-01-*'
 
     # Preprocessor()
-    # preprocessing(date, interpolate_missing=False)
-    # visualizations()
-
-    started_at = datetime.now()
     logging.info('------')
-    logging.info('Started at: %s' % started_at)
-    print(started_at)
     train_nn()
-    finished_at = datetime.now()
-    print(finished_at)
-    logging.info('Finished at: %s' % finished_at)

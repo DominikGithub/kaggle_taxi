@@ -2,6 +2,7 @@
 
 import numpy as np
 import itertools
+import datetime.datetime
 from sys import stdout
 import theano
 import theano.tensor as T
@@ -114,13 +115,13 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     valid_set_x, valid_set_y = data_validate
     test_set_x, test_set_y = data_test
 
-    batch_size = 18000
+    batch_size = 3500
     n_in = train_set_x.shape[1]
     n_out = batch_size
-    n_hidden = 200
-    n_epochs = 10
-    opt_name = 'Adadelta'   #'RmsProp'   # 'GradientDescent'
-    active_func_name = 'Rectified linear unit'  #'tanh'
+    n_hidden = 1000
+    n_epochs = 30
+    opt_name = 'Adadelta'   #'RmsProp'
+    active_func_name = 'tanh'   #'Rectified linear unit'
     n_train_batches = train_set_x.shape[0] // batch_size
     print 'training %i epochs' % n_epochs
 
@@ -129,7 +130,9 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     # wrt_flat, (Weights_hidden1, bias_hidden1, Weights_hidden2, bias_hidden2, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
     tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_out), n_out]
     wrt_flat, (Weights_hidden1, bias_hidden1, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
-    climin.initialize.randomize_normal(wrt_flat, 0, 0.01)
+    variance = 0.01
+    climin.initialize.randomize_normal(wrt_flat, 0, variance)
+    logging.info('Weight initialization: %s' % (variance))
 
     print 'tmpl: %s ' % tmpl
     logging.info('Batch size: %s' % batch_size)
@@ -222,10 +225,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     elif opt_name == 'Nlcg':
         opt = climin.NonlinearConjugateGradient(wrt_flat, loss, d_loss_wrt_pars, args=args)
     elif opt_name == 'GradientDescent':
-        step = 0.1
-        momentum = .95
-        opt = climin.GradientDescent(wrt_flat, d_loss_wrt_pars, step_rate=step, momentum=momentum, args=args)
-        logging.info('GradientDescent step rate: %s, momentum %s' % (step, momentum))
+        opt = climin.GradientDescent(wrt_flat, d_loss_wrt_pars, step_rate=0.1, momentum=.95, args=args)
     elif opt_name == 'RmsProp':
         step = 1e-4
         dec = 0.9
@@ -237,34 +237,31 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
         opt = climin.Adam(wrt_flat, d_loss_wrt_pars, step_rate=0.0002, decay=0.99999999, decay_mom1=0.1,
                           decay_mom2=0.001, momentum=0, offset=1e-08, args=args)
     elif opt_name == 'Adadelta':
-        step=1
-        dec = 0.9
-        mom = .95
+        step=0.95
+        dec=0.9
+        mom=.95
         offs=0.0001
         opt = climin.Adadelta(wrt_flat, d_loss_wrt_pars, step_rate=step, decay=dec, momentum=mom, offset=offs, args=args)
         logging.info('Adadelta step rate: %s, decay: %s, momentum: %s, offset: %s' % (step, dec, mom, offs))
-    # else:
-        # opt = climin.GradientDescent(wrt_flat, d_loss_wrt_pars, step_rate=1e-11, momentum=.95, args=args)
+
+    started_at = datetime.now()
+    logging.info('Started at: %s' % started_at)
+    print('Started at: %s' % started_at)
 
     for info in opt:
         iter = info['n_iter']
         epoch = iter // n_train_batches
 
-        # stdout.write('\r%.2f%% of Epoch %d' % (float(iter * 100) / n_train_batches - epoch * 100, (epoch + 1)))
-        # stdout.flush()
-
         if (iter + 1) % validation_frequency == 0:
             valid_loss.append(zero_one_loss(valid_set_x, valid_set_y))
             train_loss.append(zero_one_loss(train_set_x, train_set_y))
-
+            train_score = np.mean(train_loss)
             this_validation_loss = np.mean(valid_loss)
 
-            print('epoch %i, validation error %f %%' % (epoch, this_validation_loss * 100.))
+            print('epoch %i, validation error %f %%, train error %f %%' % (epoch, this_validation_loss * 100., train_score*100.))
             logging.info('epoch %i, validation error %f %%' % (epoch, this_validation_loss * 100.))
 
-            # if we got the best validation score until now
             if this_validation_loss < best_validation_loss:
-                # improve patience if loss improvement is good enough
                 if this_validation_loss < best_validation_loss * improvement_threshold:
                     patience = max(patience, iter * patience_increase)
 
@@ -288,6 +285,10 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
 
         if patience <= iter or epoch >= n_epochs:
             break
+
+    finished_at = datetime.now()
+    print('Finished at: %s' % finished_at)
+    logging.info('Finished at: %s' % finished_at)
 
     print(('Optimization complete. Best validation score of %f %% '
            'obtained at iteration %i, with test performance %f %%') %

@@ -2,7 +2,7 @@
 
 import numpy as np
 import math
-import datetime
+from datetime import datetime
 import theano
 import theano.tensor as T
 from theano import function as tfunc
@@ -11,7 +11,8 @@ import statics as st
 
 class Learning_data_builder(object):
 
-    def __init__(self, interpolate_missing=False):
+    def __init__(self, logger, interpolate_missing=False):
+        self.logger = logger
         self.empty_train_days = [3,7,11, 15, 19, 24]
         self.empty_test_days = [23, 25, 27, 29]
         self.load_prediction_times()
@@ -29,31 +30,30 @@ class Learning_data_builder(object):
         for p in prediction_date:
             self.prediction_times.append(p)
         self.prediction_times = self.prediction_times[st.n_csv_header_lines:]
-        self.pred_timeslots = [x.split('-')[3] for x in self.prediction_times]
+        self.pred_days = [x.split('-')[2] for x in self.prediction_times]
+        self.pred_timeslots = [dict(zip(st.prediction_keys, x.split('-'))) for x in self.prediction_times]
         self.n_pred_tisl = len(self.pred_timeslots)
 
     def normalize(self, data):
-        eps_norm = 1
-        print('... normalize input (calculating statistics)')
+        eps_norm = 10    #10 proposed for value range of 255
+        print('... normalize input eps_norm: %s ' % eps_norm)
+        self.logger.info('... normalizing input (eps_norm: %s) ' % eps_norm)
         data = np.asarray(data)
-        # if not hasattr(self, 'means'):
         self.means = data.mean(axis=1, keepdims=True)
-        # else:
-        #     print '... normalizing using precalculated statistics'
-        # if not hasattr(self, 'x_mean'):
         self.x_mean = data - self.means
-        # if not hasattr(self, 'variance'):
         self.variance = np.var(data, axis=1, keepdims=False)
         return self.x_mean / (np.sqrt(self.variance + eps_norm))[:, np.newaxis]
 
     def whiten(self, data):
-        print('... whiten input')
+        eps = 0.001
+        print('... whiten input (eps: %s)' % eps)
+        self.logger.info('... whiten input (eps: %s)' % eps)
         cov = T.matrix('cov', dtype=theano.config.floatX)
         eig_vals, eig_vecs = tfunc([cov], T.nlinalg.eig(cov), allow_input_downcast=True)(np.cov(data))
         x = T.matrix('x')
         vc = T.matrix('vc')
         mat_inv = T.matrix('mat_inv')
-        np_eps = 0.1 * np.eye(eig_vals.shape[0])
+        np_eps = eps * np.eye(eig_vals.shape[0])
 
         sqr_inv = np.linalg.inv(np.sqrt(np.diag(eig_vals) + np_eps))
         whitening = T.dot(T.dot(T.dot(vc, mat_inv), vc.T), x)
@@ -107,6 +107,7 @@ class Learning_data_builder(object):
         self.pois = load(st.eval_dir_test + 'pois_simple.bin')
 
     def build_training_data_per_day(self):
+        self.logger.info('... building training data: daily samples')
         self.load_daywise_data()
         samples_train = []
         gap_train = []
@@ -123,9 +124,9 @@ class Learning_data_builder(object):
 
                     samples_train.append(np.concatenate(([day],
                                                          self.traffic_train[day, distr, dtime_slt, :].flatten(),
-                                                         self.pois[distr].flatten(),
-                                                         self.dest_train[day, distr].flatten(),
-                                                         self.start_train[day, distr].flatten(),
+                                                         # self.pois[distr].flatten(),
+                                                         # self.dest_train[day, distr].flatten(),
+                                                         # self.start_train[day, distr].flatten(),
                                                          self.demand_train[day, distr, dtime_slt].flatten(),
                                                          self.supply_train[day, distr, dtime_slt].flatten(),
                                                          self.weather_train[day, :, dtime_slt].flatten()
@@ -134,39 +135,45 @@ class Learning_data_builder(object):
 
         samples_test = []
         gap_test = []
-        for d in range(st.n_districts):
-            for dtime_slt in range(self.n_pred_tisl):
-                for day in range(len(self.gap_train)):
-                    skip_day = True
-                    try:
-                        self.empty_test_days.index(day)
-                    except:
-                        skip_day = False
-                    if skip_day or day > 30:
-                        continue
+        for distr in range(st.n_districts):
+            for pred_idx, pred_dict in enumerate(self.pred_timeslots):
+                day = int(pred_dict.get('day'))
+                dtime_slt = int(pred_dict.get('timeslot'))
+                skip_day = True
+                try:
+                    self.empty_test_days.index(day)
+                except:
+                    skip_day = False
+                if skip_day or day > 30:
+                    continue
 
-                    samples_test.append(np.concatenate(([day],
-                                                         self.traffic_test[day, distr, dtime_slt, :].flatten(),
-                                                         self.pois[distr].flatten(),
-                                                         self.dest_test[day, distr].flatten(),
-                                                         self.start_test[day, distr].flatten(),
-                                                         self.demand_test[day, distr, dtime_slt].flatten(),
-                                                         self.supply_test[day, distr, dtime_slt].flatten(),
-                                                         self.weather_test[day, :, dtime_slt].flatten()
-                                                         ), axis=0))
-                    gap_test.append(self.gap_test[day, distr, dtime_slt])
+                samples_test.append(np.concatenate(([day],
+                                                     self.traffic_test[day, distr, dtime_slt, :].flatten(),
+                                                     # self.pois[distr].flatten(),
+                                                     # self.dest_test[day, distr].flatten(),
+                                                     # self.start_test[day, distr].flatten(),
+                                                     self.demand_test[day, distr, dtime_slt].flatten(),
+                                                     self.supply_test[day, distr, dtime_slt].flatten(),
+                                                     self.weather_test[day, :, dtime_slt].flatten()
+                                                     ), axis=0))
+                gap_test.append(self.gap_test[day, distr, dtime_slt])
 
         n_train = len(samples_train)
         samples_all = np.concatenate((samples_train, samples_test), axis=0)
         samples_all = self.normalize(samples_all).transpose()
         samples_all = self.whiten(samples_all).transpose()
-
         samples_train = samples_all[:n_train]
         samples_test = samples_all[n_train:]
 
-        return self.gap_train, samples_train, samples_test, gap_train, gap_test, self.prediction_times, self.n_pred_tisl
+        # samples_train = self.normalize(samples_train).transpose()
+        # samples_train = self.whiten(samples_train).transpose()
+        # samples_test = self.normalize(samples_test).transpose()
+        # samples_test = self.whiten(samples_test).transpose()
+
+        return samples_train, samples_test, gap_train, gap_test, self.prediction_times, self.n_pred_tisl
 
     def build_training_data_per_week_day(self):
+        self.logger.info('... building training data: samples per week day')
         self.load_week_day_wise_data()
         pred_timeslots = [x.split('-')[3] for x in self.prediction_times]
         n_pred_tisl = len(pred_timeslots)

@@ -32,8 +32,9 @@ This README would normally document whatever steps are necessary to get your app
 
 #### Data file formats ####
 weather: [21 x 3 x 144]=[days x types x timeslots]
-traffic:
-demand:
-supply:
+traffic: [30 x 66 x 144 x 4]=[day, distr, dtime_slt, type]
+demand/supply: [30 x 66 x 144]=[day, distr, dtime_slt]
 gap: [7 x 66 x 144]
-pois: []
+start/destination: [30 x 66=[days, distr]
+pois: [66 x 30 x 2]
+pois_simple: [66 x 30]

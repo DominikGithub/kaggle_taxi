@@ -74,13 +74,8 @@ def visualize_correlation(data, title):
     plt.savefig(title+'.png')
     plt.close()
 
-def visualize_prediction(data, title, n_time_slots, timestmp, normalize=False):
+def visualize_prediction(data, title, n_time_slots, timestmp):
     print 'plotting %s' % title
-
-    if normalize:
-        # data = norm(data)
-        print 'sci-learn scaling used in utils_image....'
-        data = preprocessing.scale(data)
 
     plt.imshow(data.transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, n_time_slots])
     axes = plt.gca()

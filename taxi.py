@@ -189,7 +189,7 @@ def train_nn(interpolate_missing=False):
     sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_day()
     # gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_week_day()
 
-    valid_size = len(sample_train) *0.3  #10000
+    valid_size = int(np.floor(len(sample_train) *0.3))  #10000
     print 'valid_size: %s' % valid_size
     tr = [np.asarray(sample_train[:-valid_size]), np.asarray(gap_train[:-valid_size])]
     print 'train: %s  %s'  % (tr[0].shape, tr[1].shape)

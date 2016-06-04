@@ -2,7 +2,10 @@
 
 import numpy as np
 import itertools
-import datetime.datetime
+import statics as st
+from utils_file import load_model, save_model
+from datetime import datetime
+from utils_date import toUTCtimestamp
 from sys import stdout
 import theano
 import theano.tensor as T
@@ -76,38 +79,38 @@ class MLP(object):
             activation=activ_func
         )
 
-        # self.hiddenLayer2 = HiddenLayer(
-        #     rng=rng,
-        #     input=self.hiddenLayer1.output,
-        #     n_in=n_hidden,
-        #     n_out=n_hidden,
-        #     W=W_hidden2,
-        #     b=b_hidden2,
-        #     activation=activ_func
-        # )
+        self.hiddenLayer2 = HiddenLayer(
+            rng=rng,
+            input=self.hiddenLayer1.output,
+            n_in=n_hidden,
+            n_out=n_hidden,
+            W=W_hidden2,
+            b=b_hidden2,
+            activation=activ_func
+        )
 
         self.outputLayer = LinearRegression(
-            input=self.hiddenLayer1.output,
-            # input = self.hiddenLayer2.output,
+            # input=self.hiddenLayer1.output,
+            input = self.hiddenLayer2.output,
             W=W_log,
             b=b_log
         )
 
         self.L1 = (
             abs(self.hiddenLayer1.W).sum()
-            # + abs(self.hiddenLayer2.W).sum()
+            + abs(self.hiddenLayer2.W).sum()
             + abs(self.outputLayer.W).sum()
         )
 
         self.L2_sqr = (
               (self.hiddenLayer1.W ** 2).sum()
-            # + (self.hiddenLayer2.W ** 2).sum()
+            + (self.hiddenLayer2.W ** 2).sum()
             + (self.outputLayer.W ** 2).sum()
         )
 
         self.errors = self.outputLayer.errors
         self.y_pred = self.outputLayer.y_pred
-        self.params = self.hiddenLayer1.params + self.outputLayer.params    # + self.hiddenLayer2.params
+        self.params = self.hiddenLayer1.params + self.hiddenLayer2.params + self.outputLayer.params
         self.input = input
 
 def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor=False):
@@ -115,22 +118,22 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     valid_set_x, valid_set_y = data_validate
     test_set_x, test_set_y = data_test
 
-    batch_size = 3500
+    batch_size = 6000
     n_in = train_set_x.shape[1]
     n_out = batch_size
-    n_hidden = 1000
-    n_epochs = 30
-    opt_name = 'Adadelta'   #'RmsProp'
-    active_func_name = 'tanh'   #'Rectified linear unit'
+    n_hidden = 40
+    n_epochs = 5
+    opt_name = 'RmsProp'    #'Adadelta'
+    active_func_name = 'tanh'
     n_train_batches = train_set_x.shape[0] // batch_size
     print 'training %i epochs' % n_epochs
 
     rng = np.random.RandomState(1234)
-    # tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_hidden), n_hidden,(n_hidden, n_out), n_out]
-    # wrt_flat, (Weights_hidden1, bias_hidden1, Weights_hidden2, bias_hidden2, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
-    tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_out), n_out]
-    wrt_flat, (Weights_hidden1, bias_hidden1, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
-    variance = 0.01
+    tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_hidden), n_hidden,(n_hidden, n_out), n_out]
+    wrt_flat, (Weights_hidden1, bias_hidden1, Weights_hidden2, bias_hidden2, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
+    # tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_out), n_out]
+    # wrt_flat, (Weights_hidden1, bias_hidden1, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
+    variance = 0.1
     climin.initialize.randomize_normal(wrt_flat, 0, variance)
     logging.info('Weight initialization: %s' % (variance))
 
@@ -154,11 +157,19 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
         active_func_name=active_func_name,
         W_hidden1 = theano.shared(value=Weights_hidden1, name='Wh', borrow=True),
         b_hidden1 = theano.shared(value=bias_hidden1, name='bh', borrow=True),
-        # W_hidden2=theano.shared(value=Weights_hidden2, name='Wh', borrow=True),
-        # b_hidden2=theano.shared(value=bias_hidden2, name='bh', borrow=True),
+        W_hidden2=theano.shared(value=Weights_hidden2, name='Wh', borrow=True),
+        b_hidden2=theano.shared(value=bias_hidden2, name='bh', borrow=True),
         W_log = theano.shared(value=Weights_log, name='Wo', borrow=True),
         b_log = theano.shared(value=bias_log, name='bo', borrow=True)
     )
+
+    try:
+        latest = load_model(classifier)
+        save_time_delta = toUTCtimestamp(datetime.utcnow())
+        print '... load latest model: %s' % latest
+    except ImportWarning as ex:
+        print ex.message
+        logging.info(ex.message)
 
     if add_L1_L2_regressor:
         L1_reg = 0.001
@@ -186,10 +197,10 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     )
 
     def d_loss_wrt_pars(parameters, inputs, targets):
-        # g_W_h, g_b_h, g_W_h2, g_b_h2, g_W_l, g_b_l = gradients(inputs, targets)
-        # return np.concatenate([g_W_h.flatten(), g_b_h, g_W_h2.flatten(), g_b_h2, g_W_l.flatten(), g_b_l])
-        g_W_h, g_b_h, g_W_l, g_b_l = gradients(inputs, targets)
-        return np.concatenate([g_W_h.flatten(), g_b_h, g_W_l.flatten(), g_b_l])
+        g_W_h, g_b_h, g_W_h2, g_b_h2, g_W_l, g_b_l = gradients(inputs, targets)
+        return np.concatenate([g_W_h.flatten(), g_b_h, g_W_h2.flatten(), g_b_h2, g_W_l.flatten(), g_b_l])
+        # g_W_h, g_b_h, g_W_l, g_b_l = gradients(inputs, targets)
+        # return np.concatenate([g_W_h.flatten(), g_b_h, g_W_l.flatten(), g_b_l])
 
     zero_one_loss = theano.function(
         inputs = [x, y],
@@ -217,16 +228,8 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
         args = climin.util.iter_minibatches([train_set_x, train_set_y], batch_size, [0, 0])
         args = ((i, {}) for i in args)
 
-    print('... using logistic regression optimizer: %s' % opt_name)
-    if opt_name == 'Bfgs':
-        opt = climin.Bfgs(wrt_flat, loss, d_loss_wrt_pars, args=args)
-    elif opt_name == 'Lbfgs':
-        opt = climin.Lbfgs(wrt_flat, loss, d_loss_wrt_pars, args=args)
-    elif opt_name == 'Nlcg':
-        opt = climin.NonlinearConjugateGradient(wrt_flat, loss, d_loss_wrt_pars, args=args)
-    elif opt_name == 'GradientDescent':
-        opt = climin.GradientDescent(wrt_flat, d_loss_wrt_pars, step_rate=0.1, momentum=.95, args=args)
-    elif opt_name == 'RmsProp':
+    print('... using linear regression optimizer: %s' % opt_name)
+    if opt_name == 'RmsProp':
         step = 1e-4
         dec = 0.9
         opt = climin.RmsProp(wrt_flat, d_loss_wrt_pars, step_rate=step, decay=dec, args=args)
@@ -237,7 +240,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
         opt = climin.Adam(wrt_flat, d_loss_wrt_pars, step_rate=0.0002, decay=0.99999999, decay_mom1=0.1,
                           decay_mom2=0.001, momentum=0, offset=1e-08, args=args)
     elif opt_name == 'Adadelta':
-        step=0.95
+        step=1
         dec=0.9
         mom=.95
         offs=0.0001
@@ -251,6 +254,10 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     for info in opt:
         iter = info['n_iter']
         epoch = iter // n_train_batches
+
+        if toUTCtimestamp(datetime.utcnow()) - save_time_delta > st.save_model_time_delta and epoch % st.save_model_freq == 0:
+            save_model(logging, classifier)
+            save_time_delta = toUTCtimestamp(datetime.utcnow())
 
         if (iter + 1) % validation_frequency == 0:
             valid_loss.append(zero_one_loss(valid_set_x, valid_set_y))
@@ -298,4 +305,5 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
            'obtained at iteration %i, with test performance %f %%') %
           (best_validation_loss * 100., best_iter + 1, test_score * 100.))
 
+    save_model(logging, classifier)
     return classifier

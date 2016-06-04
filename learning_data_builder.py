@@ -35,7 +35,7 @@ class Learning_data_builder(object):
         self.n_pred_tisl = len(self.pred_timeslots)
 
     def normalize(self, data):
-        eps_norm = 10    #10 proposed for value range of 255
+        eps_norm = 1    #10 proposed for value range of 255
         print('... normalize input eps_norm: %s ' % eps_norm)
         self.logger.info('... normalizing input (eps_norm: %s) ' % eps_norm)
         data = np.asarray(data)
@@ -45,7 +45,7 @@ class Learning_data_builder(object):
         return self.x_mean / (np.sqrt(self.variance + eps_norm))[:, np.newaxis]
 
     def whiten(self, data):
-        eps = 0.001
+        eps = 0.1
         print('... whiten input (eps: %s)' % eps)
         self.logger.info('... whiten input (eps: %s)' % eps)
         cov = T.matrix('cov', dtype=theano.config.floatX)
@@ -122,14 +122,14 @@ class Learning_data_builder(object):
                     if skip_day or day > 30:
                         continue
 
-                    samples_train.append(np.concatenate(([day],
+                    samples_train.append(np.concatenate(([day, dtime_slt],
                                                          self.traffic_train[day, distr, dtime_slt, :].flatten(),
-                                                         # self.pois[distr].flatten(),
+                                                         self.pois[distr].flatten(),
                                                          # self.dest_train[day, distr].flatten(),
                                                          # self.start_train[day, distr].flatten(),
                                                          self.demand_train[day, distr, dtime_slt].flatten(),
                                                          self.supply_train[day, distr, dtime_slt].flatten(),
-                                                         self.weather_train[day, :, dtime_slt].flatten()
+                                                         # self.weather_train[day, :, dtime_slt].flatten()
                                                      ), axis=0))
                     gap_train.append(self.gap_train[day, distr, dtime_slt])
 
@@ -147,14 +147,14 @@ class Learning_data_builder(object):
                 if skip_day or day > 30:
                     continue
 
-                samples_test.append(np.concatenate(([day],
+                samples_test.append(np.concatenate(([day, dtime_slt],
                                                      self.traffic_test[day, distr, dtime_slt, :].flatten(),
-                                                     # self.pois[distr].flatten(),
+                                                     self.pois[distr].flatten(),
                                                      # self.dest_test[day, distr].flatten(),
                                                      # self.start_test[day, distr].flatten(),
                                                      self.demand_test[day, distr, dtime_slt].flatten(),
                                                      self.supply_test[day, distr, dtime_slt].flatten(),
-                                                     self.weather_test[day, :, dtime_slt].flatten()
+                                                     # self.weather_test[day, :, dtime_slt].flatten()
                                                      ), axis=0))
                 gap_test.append(self.gap_test[day, distr, dtime_slt])
 

@@ -19,10 +19,18 @@ class LinearRegression(object):
         self.W = W
         self.b = b
         self.p_y_given_x = T.dot(input, self.W) + self.b
-
         self.y_pred = self.p_y_given_x[:,0]
-
         self.params = [self.W, self.b]
+
+    def negative_log_likelihood(self, y):
+        # return -T.mean(T.log(self.p_y_given_x)[T.arange(y.shape[0]), y])
+        # non_zero_gap_bitmap = T.neq(self.p_y_given_x, non_zero_gap)
+
+        return -T.mean(y - T.log(self.p_y_given_x)[T.arange(y.shape[0]), y])
+        # return -T.mean(T.dot(y - T.log(self.p_y_given_x)[T.arange(y.shape[0]), y], T.inv(y)))
+
+    def mean_abs_percentage_error(self, y):
+        return T.mean(abs(T.dot(y - self.y_pred, T.inv(y))))
 
     def errors(self, y):
         return T.sum(T.sqr(y-self.y_pred))
@@ -110,6 +118,8 @@ class MLP(object):
 
         self.errors = self.outputLayer.errors
         self.y_pred = self.outputLayer.y_pred
+        self.negative_log_likelihood = self.outputLayer.negative_log_likelihood
+        self.mean_abs_percentage_error = self.outputLayer.mean_abs_percentage_error
         self.params = self.hiddenLayer1.params + self.hiddenLayer2.params + self.outputLayer.params
         self.input = input
 
@@ -118,12 +128,12 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     valid_set_x, valid_set_y = data_validate
     test_set_x, test_set_y = data_test
 
-    batch_size = 6000
+    batch_size = 7000
     n_in = train_set_x.shape[1]
     n_out = batch_size
     n_hidden = 40
-    n_epochs = 5
-    opt_name = 'RmsProp'    #'Adadelta'
+    n_epochs = 50
+    opt_name = 'RmsProp'    # 'Adadelta'
     active_func_name = 'tanh'
     n_train_batches = train_set_x.shape[0] // batch_size
     print 'training %i epochs' % n_epochs
@@ -164,9 +174,10 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     )
 
     try:
-        latest = load_model(classifier)
         save_time_delta = toUTCtimestamp(datetime.utcnow())
+        latest = load_model(classifier)
         print '... load latest model: %s' % latest
+        logging.info('... load latest model: %s' % latest)
     except ImportWarning as ex:
         print ex.message
         logging.info(ex.message)
@@ -174,21 +185,15 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     if add_L1_L2_regressor:
         L1_reg = 0.001
         L2_reg = 0.0001
-        cost_reg = (classifier.errors(y)
+        cost_reg = (classifier.negative_log_likelihood(y)
                    + L1_reg * classifier.L1
                    + L2_reg * classifier.L2_sqr
         )
         logging.info('Loss L1/L2 regressor L1: %s L2: %s' % (L1_reg, L2_reg))
         # logging.info('Loss L2 regressor L2: %s' % (L2_reg))
     else:
-        cost_reg = classifier.errors(y)
+        cost_reg = classifier.negative_log_likelihood(y)
         logging.info('Loss L1/L2 regressor: None')
-
-    loss = theano.function(
-        inputs = [x, y],
-        outputs = cost_reg,
-        allow_input_downcast = True
-    )
 
     gradients = theano.function(
         inputs=[x, y],
@@ -201,6 +206,12 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
         return np.concatenate([g_W_h.flatten(), g_b_h, g_W_h2.flatten(), g_b_h2, g_W_l.flatten(), g_b_l])
         # g_W_h, g_b_h, g_W_l, g_b_l = gradients(inputs, targets)
         # return np.concatenate([g_W_h.flatten(), g_b_h, g_W_l.flatten(), g_b_l])
+
+    mean_abs_percentage_error = theano.function(
+        inputs=[x,y],
+        outputs=classifier.mean_abs_percentage_error(y),
+        allow_input_downcast=True
+    )
 
     zero_one_loss = theano.function(
         inputs = [x, y],
@@ -288,7 +299,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
                         test_score * 100.
                     )
                 )
-                logging.info(('     epoch %i, test error of'' best model %f %%') %(epoch,test_score * 100.))
+                logging.info(('     epoch %i, test error of'' best model %f %%') % (epoch,test_score * 100.))
 
         if patience <= iter or epoch >= n_epochs:
             break
@@ -304,6 +315,10 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regressor
     logging.info(('Optimization complete. Best validation score of %f %% '
            'obtained at iteration %i, with test performance %f %%') %
           (best_validation_loss * 100., best_iter + 1, test_score * 100.))
+
+    mape = mean_abs_percentage_error(test_set_x, test_set_y)
+    print('MAPE: %s' % mape)
+    logging.info('MAPE: %s' % mape)
 
     save_model(logging, classifier)
     return classifier

@@ -129,7 +129,7 @@ class Learning_data_builder(object):
                                                          # self.start_train[day, distr].flatten(),
                                                          self.demand_train[day, distr, dtime_slt].flatten(),
                                                          self.supply_train[day, distr, dtime_slt].flatten(),
-                                                         # self.weather_train[day, :, dtime_slt].flatten()
+                                                         self.weather_train[day, :, dtime_slt].flatten()
                                                      ), axis=0))
                     gap_train.append(self.gap_train[day, distr, dtime_slt])
 
@@ -154,7 +154,7 @@ class Learning_data_builder(object):
                                                      # self.start_test[day, distr].flatten(),
                                                      self.demand_test[day, distr, dtime_slt].flatten(),
                                                      self.supply_test[day, distr, dtime_slt].flatten(),
-                                                     # self.weather_test[day, :, dtime_slt].flatten()
+                                                     self.weather_test[day, :, dtime_slt].flatten()
                                                      ), axis=0))
                 gap_test.append(self.gap_test[day, distr, dtime_slt])
 

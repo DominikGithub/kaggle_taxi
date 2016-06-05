@@ -46,5 +46,5 @@ n_csv_header_lines = 1
 colormap='plasma'
 
 model_dir = 'models/'
-save_model_freq = 20
+save_model_freq = 30
 save_model_time_delta = 600

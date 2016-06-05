@@ -61,6 +61,7 @@ def save_model(logging, classifier):
         pass
     save(st.model_dir+'model_oW_'+timestmp, classifier.outputLayer.W.get_value(borrow=True))
     save(st.model_dir+'model_ob_'+timestmp, classifier.outputLayer.b.get_value(borrow=True))
+    # os.system('espeak "your model has been saved"')
 
 def load_model(classifier):
     latest_timestamp = -np.inf

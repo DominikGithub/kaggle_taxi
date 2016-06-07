@@ -34,6 +34,22 @@ class Learning_data_builder(object):
         self.pred_timeslots = [dict(zip(st.prediction_keys, x.split('-'))) for x in self.prediction_times]
         self.n_pred_tisl = len(self.pred_timeslots)
 
+    # def normalize(self, samples_train, samples_test):
+    #     eps_norm = 1    #10 proposed for value range of 255
+    #     print('... normalize input eps_norm: %s ' % eps_norm)
+    #     self.logger.info('... normalizing input (eps_norm: %s) ' % eps_norm)
+    #
+    #     data = np.asarray(samples_train)
+    #     self.means = data.mean(axis=1, keepdims=True)
+    #     self.x_mean = data - self.means
+    #     self.variance = np.var(data, axis=1, keepdims=False)
+    #     train = self.x_mean / (np.sqrt(self.variance + eps_norm))[:, np.newaxis]
+    #
+    #     data = np.asarray(samples_train)
+    #     self.x_mean = data - self.means
+    #     test = self.x_mean / (np.sqrt(self.variance + eps_norm))[:, np.newaxis]
+    #     return train, test
+
     def normalize(self, data):
         eps_norm = 1    #10 proposed for value range of 255
         print('... normalize input eps_norm: %s ' % eps_norm)
@@ -111,6 +127,9 @@ class Learning_data_builder(object):
         self.load_daywise_data()
         samples_train = []
         gap_train = []
+
+        # np.random.shuffle(dataset)
+
         for distr in range(st.n_districts):
             for dtime_slt in range(st.n_timeslots):
                 for day in range(len(self.gap_train)):
@@ -124,7 +143,7 @@ class Learning_data_builder(object):
 
                     samples_train.append(np.concatenate(([day, dtime_slt],
                                                          self.traffic_train[day, distr, dtime_slt, :].flatten(),
-                                                         self.pois[distr].flatten(),
+                                                         self.pois[distr].flatten()*0.6,
                                                          # self.dest_train[day, distr].flatten(),
                                                          # self.start_train[day, distr].flatten(),
                                                          self.demand_train[day, distr, dtime_slt].flatten(),
@@ -149,7 +168,7 @@ class Learning_data_builder(object):
 
                 samples_test.append(np.concatenate(([day, dtime_slt],
                                                      self.traffic_test[day, distr, dtime_slt, :].flatten(),
-                                                     self.pois[distr].flatten(),
+                                                     self.pois[distr].flatten()*0.6,
                                                      # self.dest_test[day, distr].flatten(),
                                                      # self.start_test[day, distr].flatten(),
                                                      self.demand_test[day, distr, dtime_slt].flatten(),
@@ -169,6 +188,9 @@ class Learning_data_builder(object):
         # samples_train = self.whiten(samples_train).transpose()
         # samples_test = self.normalize(samples_test).transpose()
         # samples_test = self.whiten(samples_test).transpose()
+
+        # samples_train, samples_test = self.normalize(samples_train, samples_test).transpose()
+        # samples_train, samples_test = self.whiten(samples_train, samples_test).transpose()
 
         return samples_train, samples_test, gap_train, gap_test, self.prediction_times, self.n_pred_tisl
 

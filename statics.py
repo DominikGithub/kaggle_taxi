@@ -13,7 +13,7 @@ eval_dir = data_dir+'evaluation/'
 eval_dir_test = data_dir_test+'evaluation/'
 
 # n_train_days = 21   #5
-n_districts = 66   # 66 kown disctricts + unkonwn many unkonwn
+n_districts = 66
 n_timeslots = 144
 
 driver_id = 'driver_id'
@@ -45,6 +45,6 @@ milli_sec_per_day = 64800
 n_csv_header_lines = 1
 colormap='plasma'
 
-model_dir = 'models/'
-save_model_freq = 30
+model_dir = 'models_single/'
+save_model_freq = 10
 save_model_time_delta = 600

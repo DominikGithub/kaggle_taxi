@@ -196,7 +196,7 @@ def train_nn(interpolate_missing=False):
     va = [np.asarray(sample_train[-valid_size:]), np.asarray(gap_train[-valid_size:])]
     te = [np.asarray(sample_test), np.asarray(gap_test)]
 
-    classifier = mlp_train(logging, tr, va, te, add_L1_L2_regressor=True)
+    classifier = mlp_train(logging, tr, va, te, add_L1_L2_regularizer=True)
 
     print '... prediction'
     predict_model = theano.function(

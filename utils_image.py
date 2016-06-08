@@ -76,7 +76,7 @@ def visualize_correlation(data, title):
 
 def visualize_prediction(data, title, n_time_slots, timestmp):
     print 'plotting %s' % title
-
+    plt.ioff()
     plt.imshow(data.transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, n_time_slots])
     axes = plt.gca()
     axes.set_xticks(xrange(0, st.n_districts+1, 11))

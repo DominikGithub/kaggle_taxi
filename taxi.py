@@ -3,6 +3,7 @@
 from sys import stdout
 import logging
 import theano
+from LogisticRegression import *
 from learning_data_builder import Learning_data_builder
 from mlp import mlp_train
 from data_container import IncMap, create_distr_Map
@@ -113,9 +114,9 @@ def preprocess_weather(date):
     smooth_visualize_weather_train()
     smooth_visualize_weather_test()
 
-def poi_map_recursive(ndarray, keys, value, lvl):
+def poi_map_recursive(ndarray, keys, value):
     if len(keys) > 1:
-        ndarray[keys[0]] = poi_map_recursive(ndarray[keys[0]], keys[1:], value, lvl+1)
+        ndarray[keys[0]] = poi_map_recursive(ndarray[keys[0]], keys[1:], value)
         return ndarray
     if len(keys) == 1:
         ndarray[keys[0]] = value
@@ -143,7 +144,7 @@ def preprocess_pois():
             poi_map_simple[distr_idx, classes[0]] += int(num)
             try:
                 keys = [distr_idx]+classes
-                poi_map_recursive(poi_map, keys, int(num), 0)
+                poi_map_recursive(poi_map, keys, int(num))
             except:
                 raise Exception('class level outside poi_map size: %s' % p) #9#1#1:14
 
@@ -181,15 +182,15 @@ def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
 
     logging.info('saved prediction to file: %s_%s.csv' % (st.eval_dir_test, save_timestmp))
     logging.info('saved prediction to file: %sprediction_%s.png' % (st.eval_dir_test, save_timestmp))
-    os.system('espeak "your program has finished"')
+    # os.system('espeak "your program has finished"')
 
 def train_nn(interpolate_missing=False):
     mape_factor_active = False
     builder = Learning_data_builder(logging)
-    sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_day()
+    sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_daily_training_data()
     # gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_week_day()
 
-    valid_size = int(np.floor(len(sample_train) *0.3))  #10000
+    valid_size = int(np.floor(len(sample_train) *0.3))
     print 'valid_size: %s' % valid_size
     tr = [np.asarray(sample_train[:-valid_size]), np.asarray(gap_train[:-valid_size])]
     print 'train: %s  %s'  % (tr[0].shape, tr[1].shape)
@@ -212,7 +213,7 @@ def train_nn(interpolate_missing=False):
         logging.info('mape factor: %i' % mape_factor)
 
 
-    print 'predition # results: %s ' % prediction.shape
+    print 'predition # results: '+str(prediction.shape)
     prediction_postprocessing(prediction, np.asarray(gap_test), prediction_times, n_pred_tisl)
 
     # diff_prediction_gap(gap, prediction)
@@ -224,4 +225,9 @@ if __name__ == "__main__":
 
     # Preprocessor()
     logging.info('------')
-    train_nn()
+    try:
+        train_nn()
+        # model = training_sgd(logging)
+        # prediction_sgd(model, logging)
+    except Exception as ex:
+        logging.error(ex.message)

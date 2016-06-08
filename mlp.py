@@ -6,7 +6,6 @@ import statics as st
 from utils_file import load_model, save_model
 from datetime import datetime
 from utils_date import toUTCtimestamp
-from sys import stdout
 import theano
 import theano.tensor as T
 import climin
@@ -18,18 +17,16 @@ class LinearRegression(object):
     def __init__(self, input, W=None, b=None):
         self.W = W
         self.b = b
-        self.p_y_given_x = T.dot(input, self.W) + self.b
-        self.y_pred = self.p_y_given_x[:,0]
+        self.input = input
         self.params = [self.W, self.b]
+        self.y_pred = T.sum(T.dot(self.input, self.W) + self.b, axis=1)
 
-    def negative_log_likelihood(self, y):
-        return -T.mean(T.log(self.p_y_given_x)[T.arange(y.shape[0]), y])
-
-    def mean_abs_percentage_error(self, y):
+    def mean_abs_percentage_error(self, x, y):
+        self.input = x
         return T.mean(abs(T.dot(y - self.y_pred, T.inv(y))))
 
     def error(self, y):
-        return T.sum(T.sqr(y-self.y_pred))
+        return T.sum(T.pow(y - self.y_pred, 2) / 2*y.shape[0])
 
 class HiddenLayer(object):
 
@@ -114,9 +111,8 @@ class MLP(object):
 
         self.error = self.outputLayer.error
         self.y_pred = self.outputLayer.y_pred
-        self.negative_log_likelihood = self.outputLayer.negative_log_likelihood
         self.mean_abs_percentage_error = self.outputLayer.mean_abs_percentage_error
-        self.params = self.hiddenLayer1.params + self.outputLayer.params    #  + self.hiddenLayer2.params
+        self.params = self.hiddenLayer1.params + self.outputLayer.params        # + self.hiddenLayer2.params
         self.input = input
 
 def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regularizer=False):
@@ -124,13 +120,13 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     valid_set_x, valid_set_y = data_validate
     test_set_x, test_set_y = data_test
 
-    batch_size = 7000
+    batch_size = 2000
     n_in = train_set_x.shape[1]
-    n_out = batch_size
-    n_hidden = 1000
-    n_epochs = 100
-    opt_name = 'RmsProp'    # 'Adadelta'
-    active_func_name = 'tanh'
+    n_out = n_in    #batch_size
+    n_hidden = 500
+    n_epochs = 500
+    opt_name = 'RmsProp'    #'Adadelta'
+    active_func_name = 'Rectified linear unit'  #'tanh'
     n_train_batches = train_set_x.shape[0] // batch_size
     print 'training %i epochs' % n_epochs
 
@@ -181,14 +177,13 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     if add_L1_L2_regularizer:
         L1_reg = 0.001
         L2_reg = 0.0001
-        cost_reg = (classifier.negative_log_likelihood(y)
+        cost_reg = (classifier.error(y)
                    + L1_reg * classifier.L1
                    + L2_reg * classifier.L2_sqr
         )
         logging.info('Loss L1/L2 regularizer L1: %s L2: %s' % (L1_reg, L2_reg))
-        # logging.info('Loss L2 regularizer L2: %s' % (L2_reg))
     else:
-        cost_reg = classifier.negative_log_likelihood(y)
+        cost_reg = classifier.error(y)
         logging.info('Loss L1/L2 regularizer: None')
 
     gradients = theano.function(
@@ -205,7 +200,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
 
     mean_abs_percentage_error = theano.function(
         inputs=[x,y],
-        outputs=classifier.mean_abs_percentage_error(y),
+        outputs=classifier.mean_abs_percentage_error(x, y),
         allow_input_downcast=True
     )
 
@@ -237,7 +232,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
 
     print('... using linear regression optimizer: %s' % opt_name)
     if opt_name == 'RmsProp':
-        step = 1e-5
+        step = 5e-5
         dec = 0.9
         opt = climin.RmsProp(wrt_flat, d_loss_wrt_pars, step_rate=step, decay=dec, args=args)
         logging.info('RmsProp step rate: %s, decay %s' % (step, dec))

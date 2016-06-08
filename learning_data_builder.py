@@ -34,22 +34,6 @@ class Learning_data_builder(object):
         self.pred_timeslots = [dict(zip(st.prediction_keys, x.split('-'))) for x in self.prediction_times]
         self.n_pred_tisl = len(self.pred_timeslots)
 
-    # def normalize(self, samples_train, samples_test):
-    #     eps_norm = 1    #10 proposed for value range of 255
-    #     print('... normalize input eps_norm: %s ' % eps_norm)
-    #     self.logger.info('... normalizing input (eps_norm: %s) ' % eps_norm)
-    #
-    #     data = np.asarray(samples_train)
-    #     self.means = data.mean(axis=1, keepdims=True)
-    #     self.x_mean = data - self.means
-    #     self.variance = np.var(data, axis=1, keepdims=False)
-    #     train = self.x_mean / (np.sqrt(self.variance + eps_norm))[:, np.newaxis]
-    #
-    #     data = np.asarray(samples_train)
-    #     self.x_mean = data - self.means
-    #     test = self.x_mean / (np.sqrt(self.variance + eps_norm))[:, np.newaxis]
-    #     return train, test
-
     def normalize(self, data):
         eps_norm = 1    #10 proposed for value range of 255
         print('... normalize input eps_norm: %s ' % eps_norm)
@@ -119,16 +103,14 @@ class Learning_data_builder(object):
         self.weather_train = load(st.eval_dir + 'weather_daywise.bin')
         self.weather_test = load(st.eval_dir_test + 'weather_daywise_test.bin')
 
-        # self.pois = load(st.eval_dir_test + 'pois.bin')
-        self.pois = load(st.eval_dir_test + 'pois_simple.bin')
+        self.pois = load(st.eval_dir_test + 'pois.bin')
+        # self.pois = load(st.eval_dir_test + 'pois_simple.bin')
 
-    def build_training_data_per_day(self):
+    def build_daily_training_data(self):
         self.logger.info('... building training data: daily samples')
         self.load_daywise_data()
         samples_train = []
-        gap_train = []
-
-        # np.random.shuffle(dataset)
+        gap_train_rslt = []
 
         for distr in range(st.n_districts):
             for dtime_slt in range(st.n_timeslots):
@@ -143,17 +125,17 @@ class Learning_data_builder(object):
 
                     samples_train.append(np.concatenate(([day, dtime_slt],
                                                          self.traffic_train[day, distr, dtime_slt, :].flatten(),
-                                                         self.pois[distr].flatten()*0.6,
-                                                         # self.dest_train[day, distr].flatten(),
-                                                         # self.start_train[day, distr].flatten(),
+                                                         # self.pois[distr].flatten(),
+                                                         self.dest_train[day, distr].flatten(),
+                                                         self.start_train[day, distr].flatten(),
                                                          self.demand_train[day, distr, dtime_slt].flatten(),
                                                          self.supply_train[day, distr, dtime_slt].flatten(),
                                                          self.weather_train[day, :, dtime_slt].flatten()
                                                      ), axis=0))
-                    gap_train.append(self.gap_train[day, distr, dtime_slt])
+                    gap_train_rslt.append(self.gap_train[day, distr, dtime_slt])
 
         samples_test = []
-        gap_test = []
+        gap_test_rslt = []
         for distr in range(st.n_districts):
             for pred_idx, pred_dict in enumerate(self.pred_timeslots):
                 day = int(pred_dict.get('day'))
@@ -168,14 +150,14 @@ class Learning_data_builder(object):
 
                 samples_test.append(np.concatenate(([day, dtime_slt],
                                                      self.traffic_test[day, distr, dtime_slt, :].flatten(),
-                                                     self.pois[distr].flatten()*0.6,
-                                                     # self.dest_test[day, distr].flatten(),
-                                                     # self.start_test[day, distr].flatten(),
+                                                     # self.pois[distr].flatten(),
+                                                     self.dest_test[day, distr].flatten(),
+                                                     self.start_test[day, distr].flatten(),
                                                      self.demand_test[day, distr, dtime_slt].flatten(),
                                                      self.supply_test[day, distr, dtime_slt].flatten(),
                                                      self.weather_test[day, :, dtime_slt].flatten()
                                                      ), axis=0))
-                gap_test.append(self.gap_test[day, distr, dtime_slt])
+                gap_test_rslt.append(self.gap_test[day, distr, dtime_slt])
 
         n_train = len(samples_train)
         samples_all = np.concatenate((samples_train, samples_test), axis=0)
@@ -192,7 +174,7 @@ class Learning_data_builder(object):
         # samples_train, samples_test = self.normalize(samples_train, samples_test).transpose()
         # samples_train, samples_test = self.whiten(samples_train, samples_test).transpose()
 
-        return samples_train, samples_test, gap_train, gap_test, self.prediction_times, self.n_pred_tisl
+        return samples_train, samples_test, gap_train_rslt, gap_test_rslt, self.prediction_times, self.n_pred_tisl
 
     def build_training_data_per_week_day(self):
         self.logger.info('... building training data: samples per week day')
@@ -201,7 +183,7 @@ class Learning_data_builder(object):
         n_pred_tisl = len(pred_timeslots)
 
         samples_train = []
-        gap_train = []
+        gap_train_rslt = []
         for d in range(st.n_districts):
             for week_day in range(7):
                 for dtime_slt in range(st.n_timeslots):
@@ -218,10 +200,10 @@ class Learning_data_builder(object):
                                                         # ,
                                                         # self.weather_train[day, dtime_slt,:].flatten()
                                                         ), axis=0))
-                    gap_train.append(self.gap_train[week_day, d, dtime_slt])
+                    gap_train_rslt.append(self.gap_train[week_day, d, dtime_slt])
 
         samples_test = []
-        gap_test = []
+        gap_test_rslt = []
         for d in range(st.n_districts):
             for dtime_slt in range(n_pred_tisl):
                 week_day = datetime.datetime.strptime(self.prediction_times[dtime_slt][:10], '%Y-%m-%d').weekday()
@@ -238,14 +220,19 @@ class Learning_data_builder(object):
                                                     # ,
                                                     # self.weather_test[day, dtime_slt,:].flatten()
                                                     ), axis=0))
-                gap_test.append(self.gap_test[week_day, d, dtime_slt])
+                gap_test_rslt.append(self.gap_test[week_day, d, dtime_slt])
 
-        n_train = len(samples_train)
-        samples_all = np.concatenate((samples_train, samples_test), axis=0)
-        samples_all = self.normalize(samples_all).transpose()
-        samples_all = self.whiten(samples_all).transpose()
+        # n_train = len(samples_train)
+        # samples_all = np.concatenate((samples_train, samples_test), axis=0)
+        # samples_all = self.normalize(samples_all).transpose()
+        # samples_all = self.whiten(samples_all).transpose()
+        #
+        # samples_train = samples_all[:n_train]
+        # samples_test = samples_all[n_train:]
 
-        samples_train = samples_all[:n_train]
-        samples_test = samples_all[n_train:]
+        samples_train = self.normalize(samples_train).transpose()
+        samples_train = self.whiten(samples_train).transpose()
+        samples_test = self.normalize(samples_test).transpose()
+        samples_test = self.whiten(samples_test).transpose()
 
-        return self.gap_train, samples_train, samples_test, gap_train, gap_test, self.prediction_times, n_pred_tisl
+        return self.gap_train, samples_train, samples_test, gap_train_rslt, gap_test_rslt, self.prediction_times, n_pred_tisl

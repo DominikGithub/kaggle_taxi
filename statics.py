@@ -45,6 +45,6 @@ milli_sec_per_day = 64800
 n_csv_header_lines = 1
 colormap='plasma'
 
-model_dir = 'models_single/'
-save_model_freq = 10
+model_dir = 'models/'
+save_model_freq = 30
 save_model_time_delta = 600

@@ -124,7 +124,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     n_in = train_set_x.shape[1]
     n_out = n_in    #batch_size
     n_hidden = 500
-    n_epochs = 500
+    n_epochs = 100
     opt_name = 'RmsProp'    #'Adadelta'
     active_func_name = 'Rectified linear unit'  #'tanh'
     n_train_batches = train_set_x.shape[0] // batch_size
@@ -137,7 +137,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     wrt_flat, (Weights_hidden1, bias_hidden1, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
     variance = 1
     climin.initialize.randomize_normal(wrt_flat, 0, variance)
-    logging.info('Weight initialization: %s' % (variance))
+    logging.info('Weight initialization variance: %s' % (variance))
 
     print 'tmpl: %s ' % tmpl
     logging.info('Batch size: %s' % batch_size)
@@ -232,7 +232,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
 
     print('... using linear regression optimizer: %s' % opt_name)
     if opt_name == 'RmsProp':
-        step = 5e-5
+        step = 1e-4
         dec = 0.9
         opt = climin.RmsProp(wrt_flat, d_loss_wrt_pars, step_rate=step, decay=dec, args=args)
         logging.info('RmsProp step rate: %s, decay %s' % (step, dec))
@@ -292,7 +292,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
                 )
                 logging.info(('     epoch %i, test error of'' best model %f %%') % (epoch,test_score * 100.))
 
-        if patience <= iter or epoch >= n_epochs:
+        if epoch >= n_epochs:   # patience <= iter or
             break
 
     finished_at = datetime.now()
@@ -311,5 +311,4 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     print('MAPE: %s' % mape)
     logging.info('MAPE: %s' % mape)
 
-    save_model(logging, classifier)
     return classifier

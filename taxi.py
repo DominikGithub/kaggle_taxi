@@ -2,7 +2,7 @@
 
 from sys import stdout
 import logging
-import theano
+from random import randint
 from LogisticRegression import *
 from learning_data_builder import Learning_data_builder
 from mlp import mlp_train
@@ -184,6 +184,30 @@ def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
     logging.info('saved prediction to file: %sprediction_%s.png' % (st.eval_dir_test, save_timestmp))
     # os.system('espeak "your program has finished"')
 
+def shuffel_data(samples, labels):
+    print '... shuffeling data'
+    logging.info('... shuffeling data')
+    rand_idx = randint(0, len(samples))
+    pattern_first_sample = samples[rand_idx]
+    pattern_first_gap = labels[rand_idx]
+    data_pair = np.column_stack([samples, np.asarray(labels)])
+    np.random.shuffle(data_pair)
+    samples = data_pair[:,:-1]
+    labels = data_pair[:,-1:].flatten()
+
+    found_match = False
+    for idx, sample in enumerate(samples):
+        if np.array_equal(pattern_first_sample, sample):
+            # print str(idx)+': '+str(pattern_first_gap)+'  '+str(labels[idx])
+            if pattern_first_gap == labels[idx]:
+                found_match = True
+            break
+    if not found_match:
+        logging.info('... shuffeling data failed to validate')
+        raise Exception('shuffeling data failed to validate')
+    return samples, labels
+
+
 def train_nn(interpolate_missing=False):
     mape_factor_active = False
     builder = Learning_data_builder(logging)
@@ -192,12 +216,14 @@ def train_nn(interpolate_missing=False):
 
     valid_size = int(np.floor(len(sample_train) *0.3))
     print 'valid_size: %s' % valid_size
+    sample_train, gap_train = shuffel_data(sample_train, gap_train)
     tr = [np.asarray(sample_train[:-valid_size]), np.asarray(gap_train[:-valid_size])]
     print 'train: %s  %s'  % (tr[0].shape, tr[1].shape)
     va = [np.asarray(sample_train[-valid_size:]), np.asarray(gap_train[-valid_size:])]
     te = [np.asarray(sample_test), np.asarray(gap_test)]
 
     classifier = mlp_train(logging, tr, va, te, add_L1_L2_regularizer=True)
+    save_model(logging, classifier)
 
     print '... prediction'
     predict_model = theano.function(
@@ -212,8 +238,6 @@ def train_nn(interpolate_missing=False):
         prediction *= mape_factor
         logging.info('mape factor: %i' % mape_factor)
 
-
-    print 'predition # results: '+str(prediction.shape)
     prediction_postprocessing(prediction, np.asarray(gap_test), prediction_times, n_pred_tisl)
 
     # diff_prediction_gap(gap, prediction)
@@ -225,9 +249,6 @@ if __name__ == "__main__":
 
     # Preprocessor()
     logging.info('------')
-    try:
-        train_nn()
-        # model = training_sgd(logging)
-        # prediction_sgd(model, logging)
-    except Exception as ex:
-        logging.error(ex.message)
+    train_nn()
+    # model = training_sgd(logging)
+    # prediction_sgd(model, logging)

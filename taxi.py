@@ -182,7 +182,7 @@ def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
 
     logging.info('saved prediction to file: %s_%s.csv' % (st.eval_dir_test, save_timestmp))
     logging.info('saved prediction to file: %sprediction_%s.png' % (st.eval_dir_test, save_timestmp))
-    # os.system('espeak "your program has finished"')
+    os.system('espeak "your program has finished"')
 
 def shuffel_data(samples, labels):
     print '... shuffeling data'
@@ -207,25 +207,34 @@ def shuffel_data(samples, labels):
         raise Exception('shuffeling data failed to validate')
     return samples, labels
 
-
 def train_nn(interpolate_missing=False):
-    mape_factor_active = False
     builder = Learning_data_builder(logging)
     sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_daily_training_data()
-    # gap, sample_train, sample_test, gap_train, gap_test, prediction_times, n_pred_tisl = builder.build_training_data_per_week_day()
 
     valid_size = int(np.floor(len(sample_train) *0.3))
     print 'valid_size: %s' % valid_size
-    sample_train, gap_train = shuffel_data(sample_train, gap_train)
-    tr = [np.asarray(sample_train[:-valid_size]), np.asarray(gap_train[:-valid_size])]
-    print 'train: %s  %s'  % (tr[0].shape, tr[1].shape)
-    va = [np.asarray(sample_train[-valid_size:]), np.asarray(gap_train[-valid_size:])]
-    te = [np.asarray(sample_test), np.asarray(gap_test)]
 
-    classifier = mlp_train(logging, tr, va, te, add_L1_L2_regularizer=True)
-    save_model(logging, classifier)
+    for shuffel in range(st.n_times_shuffel):
+        print 'shuffeling: %i of %i' % (shuffel, st.n_times_shuffel)
+        logging.info('shuffeling: %i of %i' % (shuffel, st.n_times_shuffel))
 
+        sample_train, gap_train = shuffel_data(sample_train, gap_train)
+        tr = [np.asarray(sample_train[:-valid_size]), np.asarray(gap_train[:-valid_size])]
+        print 'train: %s  %s'  % (tr[0].shape, tr[1].shape)
+        va = [np.asarray(sample_train[-valid_size:]), np.asarray(gap_train[-valid_size:])]
+        te = [np.asarray(sample_test), np.asarray(gap_test)]
+
+        classifier = mlp_train(logging, tr, va, te, add_L1_L2_regularizer=True)
+
+    return classifier
+
+def predict_nn(classifier):
     print '... prediction'
+    mape_factor_active = False
+
+    builder = Learning_data_builder(logging)
+    sample_test, gap_test, prediction_times, n_pred_tisl = builder.get_daily_test_data()
+
     predict_model = theano.function(
         inputs=[classifier.input],
         outputs=classifier.y_pred,
@@ -249,6 +258,7 @@ if __name__ == "__main__":
 
     # Preprocessor()
     logging.info('------')
-    train_nn()
+    classifier = train_nn()
+    predict_nn(classifier)
     # model = training_sgd(logging)
     # prediction_sgd(model, logging)

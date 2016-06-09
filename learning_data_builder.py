@@ -34,8 +34,17 @@ class Learning_data_builder(object):
         self.pred_timeslots = [dict(zip(st.prediction_keys, x.split('-'))) for x in self.prediction_times]
         self.n_pred_tisl = len(self.pred_timeslots)
 
+    # def specify_standardization_parameter(self, data):
+    #     data = np.asarray(data)
+    #     self.means = data.mean(axis=1, keepdims=True)
+    #     self.variance = data.var(axis=1, keepdims=False)
+
     def normalize(self, data):
         eps_norm = 1    #10 proposed for value range of 255
+        # if not hasattr(self, 'means'):
+        #     raise Exception('Mean on training data must be specified before normalization')
+        # if not hasattr(self, 'variance'):
+        #     raise Exception('variance on training data must be specified before normalization')
         print('... normalize input eps_norm: %s ' % eps_norm)
         self.logger.info('... normalizing input (eps_norm: %s) ' % eps_norm)
         data = np.asarray(data)
@@ -80,7 +89,7 @@ class Learning_data_builder(object):
         # self.pois = load(st.eval_dir+'pois.bin')
         self.pois = load(st.eval_dir + 'pois_simple.bin')
 
-    def load_daywise_data(self):
+    def load_daily_data(self):
         self.load_prediction_times()
         self.demand_train = load(st.eval_dir + 'demand_daywise.bin')
         self.demand_test = load(st.eval_dir_test + 'demand_daywise.bin')
@@ -106,9 +115,39 @@ class Learning_data_builder(object):
         self.pois = load(st.eval_dir_test + 'pois.bin')
         # self.pois = load(st.eval_dir_test + 'pois_simple.bin')
 
+    def get_daily_test_data(self):
+        self.load_daily_data()
+
+        samples_test = []
+        gap_test_rslt = []
+        for distr in range(st.n_districts):
+            for pred_idx, pred_dict in enumerate(self.pred_timeslots):
+                day = int(pred_dict.get('day'))
+                dtime_slt = int(pred_dict.get('timeslot'))
+                skip_day = True
+                try:
+                    self.empty_test_days.index(day)
+                except:
+                    skip_day = False
+                if skip_day or day > 30:
+                    continue
+
+                samples_test.append(np.concatenate(([day, dtime_slt],
+                                                    self.traffic_test[day, distr, dtime_slt, :].flatten(),
+                                                    # self.pois[distr].flatten(),
+                                                    self.dest_test[day, distr].flatten(),
+                                                    self.start_test[day, distr].flatten(),
+                                                    self.demand_test[day, distr, dtime_slt].flatten(),
+                                                    self.supply_test[day, distr, dtime_slt].flatten(),
+                                                    self.weather_test[day, :, dtime_slt].flatten()
+                                                    ), axis=0))
+                gap_test_rslt.append(self.gap_test[day, distr, dtime_slt])
+
+        return samples_test, gap_test_rslt, self.prediction_times, self.n_pred_tisl
+
     def build_daily_training_data(self):
         self.logger.info('... building training data: daily samples')
-        self.load_daywise_data()
+        self.load_daily_data()
         samples_train = []
         gap_train_rslt = []
 
@@ -160,6 +199,7 @@ class Learning_data_builder(object):
                 gap_test_rslt.append(self.gap_test[day, distr, dtime_slt])
 
         n_train = len(samples_train)
+        # self.specify_standardization_parameter(samples_train)
         samples_all = np.concatenate((samples_train, samples_test), axis=0)
         samples_all = self.normalize(samples_all).transpose()
         samples_all = self.whiten(samples_all).transpose()
@@ -170,9 +210,6 @@ class Learning_data_builder(object):
         # samples_train = self.whiten(samples_train).transpose()
         # samples_test = self.normalize(samples_test).transpose()
         # samples_test = self.whiten(samples_test).transpose()
-
-        # samples_train, samples_test = self.normalize(samples_train, samples_test).transpose()
-        # samples_train, samples_test = self.whiten(samples_train, samples_test).transpose()
 
         return samples_train, samples_test, gap_train_rslt, gap_test_rslt, self.prediction_times, self.n_pred_tisl
 
@@ -223,6 +260,7 @@ class Learning_data_builder(object):
                 gap_test_rslt.append(self.gap_test[week_day, d, dtime_slt])
 
         # n_train = len(samples_train)
+        # self.specify_standardization_parameter(samples_train)
         # samples_all = np.concatenate((samples_train, samples_test), axis=0)
         # samples_all = self.normalize(samples_all).transpose()
         # samples_all = self.whiten(samples_all).transpose()

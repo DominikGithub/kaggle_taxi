@@ -15,9 +15,9 @@ import climin.util
 class LinearRegression(object):
 
     def __init__(self, input, W=None, b=None):
+        self.input = input
         self.W = W
         self.b = b
-        self.input = input
         self.params = [self.W, self.b]
         self.y_pred = T.sum(T.dot(self.input, self.W) + self.b, axis=1)
 
@@ -124,9 +124,9 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     n_in = train_set_x.shape[1]
     n_out = n_in    #batch_size
     n_hidden = 500
-    n_epochs = 100
+    n_epochs = 20
     opt_name = 'RmsProp'    #'Adadelta'
-    active_func_name = 'Rectified linear unit'  #'tanh'
+    active_func_name = 'tanh'   #'Rectified linear unit'
     n_train_batches = train_set_x.shape[0] // batch_size
     print 'training %i epochs' % n_epochs
 
@@ -165,15 +165,6 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
         b_log = theano.shared(value=bias_log, name='bo', borrow=True)
     )
 
-    try:
-        save_time_delta = toUTCtimestamp(datetime.utcnow())
-        latest = load_model(classifier)
-        print '... load latest model: %s' % latest
-        logging.info('... load latest model: %s' % latest)
-    except ImportWarning as ex:
-        print ex.message
-        logging.info(ex.message)
-
     if add_L1_L2_regularizer:
         L1_reg = 0.001
         L2_reg = 0.0001
@@ -191,6 +182,15 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
         outputs=T.grad(cost_reg, classifier.params),
         allow_input_downcast=True
     )
+
+    try:
+        save_time_delta = toUTCtimestamp(datetime.utcnow())
+        latest, classifier = load_model(classifier)
+        print '... load latest model: %s' % latest
+        logging.info('... load latest model: %s' % latest)
+    except ImportWarning as ex:
+        print ex.message
+        logging.info(ex.message)
 
     def d_loss_wrt_pars(parameters, inputs, targets):
         # g_W_h, g_b_h, g_W_h2, g_b_h2, g_W_l, g_b_l = gradients(inputs, targets)
@@ -232,8 +232,8 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
 
     print('... using linear regression optimizer: %s' % opt_name)
     if opt_name == 'RmsProp':
-        step = 1e-4
-        dec = 0.9
+        step = 3e-5
+        dec = 0.92
         opt = climin.RmsProp(wrt_flat, d_loss_wrt_pars, step_rate=step, decay=dec, args=args)
         logging.info('RmsProp step rate: %s, decay %s' % (step, dec))
     elif opt_name == 'Rprop':
@@ -310,5 +310,6 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     mape = mean_abs_percentage_error(test_set_x, test_set_y)
     print('MAPE: %s' % mape)
     logging.info('MAPE: %s' % mape)
+    save_model(logging, classifier)
 
     return classifier

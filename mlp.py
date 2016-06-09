@@ -124,9 +124,9 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     n_in = train_set_x.shape[1]
     n_out = n_in    #batch_size
     n_hidden = 500
-    n_epochs = 20
+    n_epochs = 250
     opt_name = 'RmsProp'    #'Adadelta'
-    active_func_name = 'tanh'   #'Rectified linear unit'
+    active_func_name = 'Rectified linear unit'  #'tanh'
     n_train_batches = train_set_x.shape[0] // batch_size
     print 'training %i epochs' % n_epochs
 
@@ -232,8 +232,8 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
 
     print('... using linear regression optimizer: %s' % opt_name)
     if opt_name == 'RmsProp':
-        step = 3e-5
-        dec = 0.92
+        step = 1e-4
+        dec = 0.9
         opt = climin.RmsProp(wrt_flat, d_loss_wrt_pars, step_rate=step, decay=dec, args=args)
         logging.info('RmsProp step rate: %s, decay %s' % (step, dec))
     elif opt_name == 'Rprop':

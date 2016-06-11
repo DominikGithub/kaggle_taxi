@@ -158,8 +158,7 @@ def preprocessing(date='*', interpolate_missing=False):
     preprocess_traffic(date, interpolate_missing)
     preprocess_orders(date)
 
-def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl):
-    save_timestmp = toUTCtimestamp(datetime.utcnow())
+def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl, save_timestmp):
     pred_formatted = np.asarray([float('%.2f' % x) for x in data.tolist()]).reshape((st.n_districts, n_pred_tisl))
     save_predictions(prediction_times, pred_formatted, save_timestmp)
     visualize_prediction((pred_formatted), 'prediction', n_pred_tisl, save_timestmp)
@@ -214,6 +213,7 @@ def train_nn(interpolate_missing=False):
     valid_size = int(np.floor(len(sample_train) *0.3))
     print 'valid_size: %s' % valid_size
 
+    classifier = None
     for shuffel in range(st.n_times_shuffel):
         print 'shuffeling: %i of %i' % (shuffel, st.n_times_shuffel)
         logging.info('shuffeling: %i of %i' % (shuffel, st.n_times_shuffel))
@@ -225,7 +225,9 @@ def train_nn(interpolate_missing=False):
         te = [np.asarray(sample_test), np.asarray(gap_test)]
 
         classifier = mlp_train(logging, tr, va, te, add_L1_L2_regularizer=True)
+        save_model(logging, classifier)
 
+    assert classifier is not None, 'Classifier was not initialized while training'
     return classifier
 
 def predict_nn(classifier):
@@ -247,11 +249,17 @@ def predict_nn(classifier):
         prediction *= mape_factor
         logging.info('mape factor: %i' % mape_factor)
 
-    prediction_postprocessing(prediction, np.asarray(gap_test), prediction_times, n_pred_tisl)
+    save_timestmp = toUTCtimestamp(datetime.utcnow())
+    dot_idx = str(save_timestmp).index('.')
+    save_timestmp = str(save_timestmp)[:dot_idx]
+    prediction_postprocessing(prediction, np.asarray(gap_test), prediction_times, n_pred_tisl, save_timestmp)
+    diff_prediction_gap(gap_test, prediction, n_pred_tisl, save_timestmp)
+    plot_receptive_fields(classifier, save_timestmp)
 
-    # diff_prediction_gap(gap, prediction)
-# def diff_prediction_gap(gap, prediction):
-    # visualize(gap.flatten()-prediction, 'gap vs prediction')
+def diff_prediction_gap(gap, prediction, timeslots, timestmp):
+    print '... plotting gap vs prediction'
+    diff = np.asarray([j - i for i, j in zip(gap, prediction)]).reshape((66, 43))
+    visualize_prediction(diff, 'diff gap vs prediction', timeslots, timestmp)
 
 if __name__ == "__main__":
     date = '2016-01-*'

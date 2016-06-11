@@ -201,3 +201,21 @@ def visualize_oneDim(data, title):
 
     plt.savefig(st.eval_dir+title+'.png')
     plt.close()
+
+def plot_receptive_fields(classifier, timestamp):
+    print '... plotting receptive fields'
+    h1W = classifier.hiddenLayer1.W.get_value(borrow=True)
+    n_hidden = h1W.shape[1]
+    n_rows = 2
+    n_cols = h1W.shape[1] // 2
+    plt.ioff()
+    ax1 = plt.subplot(1, n_hidden, 1)
+    for neuron in range(n_hidden):
+        ax2 = plt.subplot(n_rows, n_cols, neuron+1)
+        ax2.imshow(h1W[:, neuron].reshape((h1W.shape[0], 1)), cmap='Greys_r')
+        plt.axis('off')
+    # plt.suptitle('MLP, %i hidden neurons, activation function: %s, optimizer: %s, test error: %.2f, running %i epochs' %
+    #              (n_hidden, h_active_funcs[ac_func_id], rslt_list[ac_func_id].optimizer,
+    #               np.mean(rslt_list[ac_func_id].test) * 100, rslt_list[ac_func_id].epochs), fontsize=9)
+    plt.savefig('models/repfields_%s.png' % timestamp)
+    plt.close()

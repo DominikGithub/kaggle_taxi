@@ -106,17 +106,20 @@ def load_model(classifier):
 
             classifier.hiddenLayer1.W.set_value(classifier.params[0].get_value(borrow=True), borrow=True)
             classifier.hiddenLayer1.b.set_value(classifier.params[1].get_value(borrow=True), borrow=True)
-            #TODO hidden 2
+
             if len(classifier.params) > 4:
-                raise Exception('No more than 1 hidden layer loading implemented!')
-            classifier.outputLayer.W.set_value(classifier.params[2].get_value(borrow=True), borrow=True)
-            classifier.outputLayer.b.set_value(classifier.params[3].get_value(borrow=True), borrow=True)
+                classifier.hiddenLayer2.W.set_value(classifier.params[2].get_value(borrow=True), borrow=True)
+                classifier.hiddenLayer2.b.set_value(classifier.params[3].get_value(borrow=True), borrow=True)
+                classifier.outputLayer.W.set_value(classifier.params[4].get_value(borrow=True), borrow=True)
+                classifier.outputLayer.b.set_value(classifier.params[5].get_value(borrow=True), borrow=True)
+            else:
+                classifier.outputLayer.W.set_value(classifier.params[2].get_value(borrow=True), borrow=True)
+                classifier.outputLayer.b.set_value(classifier.params[3].get_value(borrow=True), borrow=True)
 
     return latest_timestamp, classifier
 
 def save_predictions(timeslots, predictions, timestmp):
-    dot_idx = str(timestmp).index('.')
-    with open('predictions/predictions_'+str(timestmp)[:dot_idx]+'.csv', 'wb') as f:
+    with open('predictions/predictions_'+str(timestmp)+'.csv', 'wb') as f:
         writer = csv.writer(f, delimiter=',')
 
         csv_data = ['District ID', 'Time slot', 'Prediction value']

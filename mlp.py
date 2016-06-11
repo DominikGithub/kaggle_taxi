@@ -4,8 +4,9 @@ import numpy as np
 import itertools
 import statics as st
 from utils_file import load_model, save_model
-from datetime import datetime
+from utils_image import plot_receptive_fields
 from utils_date import toUTCtimestamp
+from datetime import datetime
 import theano
 import theano.tensor as T
 import climin
@@ -80,39 +81,39 @@ class MLP(object):
             activation=activ_func
         )
 
-        # self.hiddenLayer2 = HiddenLayer(
-        #     rng=rng,
-        #     input=self.hiddenLayer1.output,
-        #     n_in=n_hidden,
-        #     n_out=n_hidden,
-        #     W=W_hidden2,
-        #     b=b_hidden2,
-        #     activation=activ_func
-        # )
+        self.hiddenLayer2 = HiddenLayer(
+            rng=rng,
+            input=self.hiddenLayer1.output,
+            n_in=n_hidden,
+            n_out=n_hidden,
+            W=W_hidden2,
+            b=b_hidden2,
+            activation=activ_func
+        )
 
         self.outputLayer = LinearRegression(
-            input=self.hiddenLayer1.output,
-            # input = self.hiddenLayer2.output,
+            # input=self.hiddenLayer1.output,
+            input = self.hiddenLayer2.output,
             W=W_log,
             b=b_log
         )
 
         self.L1 = (
             abs(self.hiddenLayer1.W).sum()
-            # + abs(self.hiddenLayer2.W).sum()
+            + abs(self.hiddenLayer2.W).sum()
             + abs(self.outputLayer.W).sum()
         )
 
         self.L2_sqr = (
               (self.hiddenLayer1.W ** 2).sum()
-            # + (self.hiddenLayer2.W ** 2).sum()
+            + (self.hiddenLayer2.W ** 2).sum()
             + (self.outputLayer.W ** 2).sum()
         )
 
         self.error = self.outputLayer.error
         self.y_pred = self.outputLayer.y_pred
         self.mean_abs_percentage_error = self.outputLayer.mean_abs_percentage_error
-        self.params = self.hiddenLayer1.params + self.outputLayer.params        # + self.hiddenLayer2.params
+        self.params = self.hiddenLayer1.params + self.hiddenLayer2.params + self.outputLayer.params
         self.input = input
 
 def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regularizer=False):
@@ -120,21 +121,21 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     valid_set_x, valid_set_y = data_validate
     test_set_x, test_set_y = data_test
 
-    batch_size = 2000
+    batch_size = 5000
     n_in = train_set_x.shape[1]
-    n_out = n_in    #batch_size
-    n_hidden = 500
-    n_epochs = 250
+    n_out = 200  #n_in    #batch_size
+    n_hidden = 100
+    n_epochs = 20
     opt_name = 'RmsProp'    #'Adadelta'
-    active_func_name = 'Rectified linear unit'  #'tanh'
+    active_func_name = 'tanh'   # 'Rectified linear unit'
     n_train_batches = train_set_x.shape[0] // batch_size
     print 'training %i epochs' % n_epochs
 
     rng = np.random.RandomState(1234)
-    # tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_hidden), n_hidden,(n_hidden, n_out), n_out]
-    # wrt_flat, (Weights_hidden1, bias_hidden1, Weights_hidden2, bias_hidden2, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
-    tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_out), n_out]
-    wrt_flat, (Weights_hidden1, bias_hidden1, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
+    tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_hidden), n_hidden,(n_hidden, n_out), n_out]
+    wrt_flat, (Weights_hidden1, bias_hidden1, Weights_hidden2, bias_hidden2, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
+    # tmpl = [(n_in, n_hidden), n_hidden, (n_hidden, n_out), n_out]
+    # wrt_flat, (Weights_hidden1, bias_hidden1, Weights_log, bias_log) = climin.util.empty_with_views(tmpl)
     variance = 1
     climin.initialize.randomize_normal(wrt_flat, 0, variance)
     logging.info('Weight initialization variance: %s' % (variance))
@@ -159,8 +160,8 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
         active_func_name=active_func_name,
         W_hidden1 = theano.shared(value=Weights_hidden1, name='Wh', borrow=True),
         b_hidden1 = theano.shared(value=bias_hidden1, name='bh', borrow=True),
-        # W_hidden2=theano.shared(value=Weights_hidden2, name='Wh', borrow=True),
-        # b_hidden2=theano.shared(value=bias_hidden2, name='bh', borrow=True),
+        W_hidden2=theano.shared(value=Weights_hidden2, name='Wh', borrow=True),
+        b_hidden2=theano.shared(value=bias_hidden2, name='bh', borrow=True),
         W_log = theano.shared(value=Weights_log, name='Wo', borrow=True),
         b_log = theano.shared(value=bias_log, name='bo', borrow=True)
     )
@@ -192,9 +193,15 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
         print ex.message
         logging.info(ex.message)
 
+
+    # latest, classifier = load_model(classifier)
+    # plot_receptive_fields(classifier, latest)
+    # return
+
+
     def d_loss_wrt_pars(parameters, inputs, targets):
-        # g_W_h, g_b_h, g_W_h2, g_b_h2, g_W_l, g_b_l = gradients(inputs, targets)
-        # return np.concatenate([g_W_h.flatten(), g_b_h, g_W_h2.flatten(), g_b_h2, g_W_l.flatten(), g_b_l])
+        g_W_h, g_b_h, g_W_h2, g_b_h2, g_W_l, g_b_l = gradients(inputs, targets)
+        return np.concatenate([g_W_h.flatten(), g_b_h, g_W_h2.flatten(), g_b_h2, g_W_l.flatten(), g_b_l])
         g_W_h, g_b_h, g_W_l, g_b_l = gradients(inputs, targets)
         return np.concatenate([g_W_h.flatten(), g_b_h, g_W_l.flatten(), g_b_l])
 
@@ -252,6 +259,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     started_at = datetime.now()
     logging.info('Started at: %s' % started_at)
     print('Started at: %s' % started_at)
+    step_rate = None
 
     for info in opt:
         iter = info['n_iter']
@@ -293,8 +301,10 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
                 logging.info(('     epoch %i, test error of'' best model %f %%') % (epoch,test_score * 100.))
 
         if epoch >= n_epochs:   # patience <= iter or
+            step_rate = info.get('step_rate')
             break
 
+    print 'finished at step_rate: %f' % step_rate
     finished_at = datetime.now()
     print('Finished at: %s' % finished_at)
     logging.info('Finished at: %s' % finished_at)
@@ -310,6 +320,5 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     mape = mean_abs_percentage_error(test_set_x, test_set_y)
     print('MAPE: %s' % mape)
     logging.info('MAPE: %s' % mape)
-    save_model(logging, classifier)
 
     return classifier

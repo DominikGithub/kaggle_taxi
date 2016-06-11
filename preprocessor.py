@@ -12,17 +12,17 @@ class Preprocessor(object):
     file_postfix = '_daywise'
 
     def __init__(self, interpolate_missing=False):
-        # self.process_orders_day_wise(date='2016-01-*')
+        self.process_orders_day_wise(date='2016-01-*')
         # self.process_traffic_day_wise(date='2016-01-*', interpolate_missing=False)
         # self.preprocess_weather(date='2016-01-*')
 
-        # visualize_orders(self.normalize(load(st.eval_dir + 'demand'+self.file_postfix+'.bin')), 'Demand'+self.file_postfix)
-        # visualize_orders(self.normalize(load(st.eval_dir + 'supply'+self.file_postfix+'.bin')), 'Supply'+self.file_postfix)
-        # visualize_orders(self.normalize(load(st.eval_dir + 'gap'+self.file_postfix+'.bin')), 'Gap'+self.file_postfix)
-        # hist(load(st.eval_dir + 'start_dist'+self.file_postfix+'.bin'), 'Start_dist'+self.file_postfix, y_range=[70, 180000])
-        # hist(load(st.eval_dir + 'dest_dist'+self.file_postfix+'.bin'), 'Dest_dist'+self.file_postfix, y_range=[70, 120000])
+        visualize_orders(self.normalize(load(st.eval_dir + 'demand'+self.file_postfix+'.bin')), 'Demand'+self.file_postfix)
+        visualize_orders(self.normalize(load(st.eval_dir + 'supply'+self.file_postfix+'.bin')), 'Supply'+self.file_postfix)
+        visualize_orders(self.normalize(load(st.eval_dir + 'gap'+self.file_postfix+'.bin')), 'Gap'+self.file_postfix)
+        hist(load(st.eval_dir + 'start_dist'+self.file_postfix+'.bin'), 'Start_dist'+self.file_postfix, y_range=[70, 180000])
+        hist(load(st.eval_dir + 'dest_dist'+self.file_postfix+'.bin'), 'Dest_dist'+self.file_postfix, y_range=[70, 120000])
         # visualize_traffic(self.normalize(load(st.eval_dir + 'traffic'+self.file_postfix+'.bin')), 'Traffic'+self.file_postfix)
-        os.system('espeak "Preprocessing has finished"')
+        # os.system('espeak "Preprocessing has finished"')
 
     def normalize(self, data):
         eps_norm = 1
@@ -35,8 +35,8 @@ class Preprocessor(object):
 
     def preprocess_weather(self, date):
         print 'preprocessing weather'
-        train_case = {'days': 32, 'tistmp_day_start': -2, 'tistmp_day_end': None, 'path_data': st.data_dir,       'path_eval': st.eval_dir}
-        test_case =  {'days': 32, 'tistmp_day_start': -7, 'tistmp_day_end': -5,     'path_data': st.data_dir_test,'path_eval': st.eval_dir_test}
+        train_case = {'days': 31, 'tistmp_day_start': -2, 'tistmp_day_end': None, 'path_data': st.data_dir,       'path_eval': st.eval_dir}
+        test_case =  {'days': 31, 'tistmp_day_start': -7, 'tistmp_day_end': -5,     'path_data': st.data_dir_test,'path_eval': st.eval_dir_test}
         cases = [train_case, test_case]
 
         for case in cases:
@@ -70,7 +70,7 @@ class Preprocessor(object):
         file_list = glob.glob(st.data_dir + 'traffic_data_' + date)
         n_days = len(file_list)
         for file_name in file_list:
-            day = get_day(file_name[-10:])  # set 15 for test data
+            day = int(file_name[-10:][8:10])    #get_day(file_name[-10:])  # set 15 for test data
             if n_days < day:
                 n_days = day
         n_days += 1
@@ -91,7 +91,7 @@ class Preprocessor(object):
                 distr_idx = int(dist_map.getkey_or_create(distr_hash)) - 1
                 tj_lvl = sing_traf[1:len(sing_traf) - 1]
                 time_str = sing_traf[len(sing_traf) - 1]
-                day = get_day(time_str)
+                day = int(time_str[8:10])#get_day(time_str)
                 tslot_idx = int(get_timeslot(time_str))
 
                 for lvl in range(len(tj_lvl)):
@@ -112,7 +112,7 @@ class Preprocessor(object):
         file_list = glob.glob(st.data_dir + 'order_data_' + date)
         n_days = len(file_list)
         for file_name in file_list:
-            day = get_day(file_name[-10:])  # set 15 for test data
+            day = int(file_name[-10:][8:10]) #get_day(file_name[-15:])  # set 15 for test data
             if n_days < day:
                 n_days = day
         n_days += 1
@@ -138,7 +138,7 @@ class Preprocessor(object):
             s_distr_idx = int(dist_map.getkey_or_create(order[st.start_district_hash])) - 1
             d_distr_idx = int(dist_map.getkey_or_create(order[st.dest_district_hash])) - 1
             # week_day = datetime.strptime(order[st.time], '%Y-%m-%d %H:%M:%S').weekday()
-            day = get_day(order[st.time])
+            day = int(order[st.time][8:10])#get_day(order[st.time])
             tslot_idx = int(get_timeslot(order[st.time]))
 
             if order[st.driver_id] == 'NULL':

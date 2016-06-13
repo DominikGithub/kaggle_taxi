@@ -14,7 +14,8 @@ class Learning_data_builder(object):
     def __init__(self, logger, interpolate_missing=False):
         self.logger = logger
         self.empty_train_days = [3,7,11, 15, 19, 24]
-        self.empty_test_days = [23, 25, 27, 29]
+        # self.empty_test_days = [23, 25, 27, 29, 31]
+        self.empty_test_days = [24, 26, 28, 30]
         self.load_prediction_times()
         # self.traffic = load(st.eval_dir_test+'traffic.bin')
         # if interpolate_missing:
@@ -25,7 +26,7 @@ class Learning_data_builder(object):
 
     def load_prediction_times(self):
         self.prediction_times = []
-        with open(st.data_dir_test + 'read_me_1.txt') as f:
+        with open(st.data_dir_test + 'read_me_2.txt') as f:
             prediction_date = f.read().splitlines()
         for p in prediction_date:
             self.prediction_times.append(p)
@@ -70,27 +71,26 @@ class Learning_data_builder(object):
         return zca(data, eig_vecs, sqr_inv)
 
     def load_week_day_wise_data(self):
-        self.traffic_train = load(st.eval_dir + 'traffic.bin')
-        self.traffic_test = load(st.eval_dir_test + 'traffic.bin')
+        self.traffic_train_w = load(st.eval_dir + 'traffic.bin')
+        self.traffic_test_w = load(st.eval_dir_test + 'traffic.bin')
 
-        self.destination_train = load(st.eval_dir + 'dest_dist.bin')
-        self.destination_test = load(st.eval_dir_test + 'dest_dist.bin')
-        self.start_train = load(st.eval_dir_test + 'start_dist.bin')
-        self.start_test = load(st.eval_dir + 'start_dist.bin')
-        # self.weather_train = load(st.eval_dir+'weather.bin')
-        # self.weather_test = load(st.eval_dir_test+'weather.bin')
+        self.destination_train_w = load(st.eval_dir + 'dest_dist.bin')
+        self.destination_test_w = load(st.eval_dir_test + 'dest_dist.bin')
+        self.start_train_w = load(st.eval_dir_test + 'start_dist.bin')
+        self.start_test_w = load(st.eval_dir + 'start_dist.bin')
+        # self.weather_train_w = load(st.eval_dir+'weather.bin')
+        # self.weather_test_w = load(st.eval_dir_test+'weather.bin')
 
-        self.demand_test = load(st.eval_dir_test + 'demand.bin')
-        self.demand_train = load(st.eval_dir + 'demand.bin')
-        self.supply_test = load(st.eval_dir_test + 'supply.bin')
-        self.supply_train = load(st.eval_dir + 'supply.bin')
-        self.gap_train = load(st.eval_dir + 'gap.bin')
-        self.gap_test = load(st.eval_dir_test + 'gap.bin')
+        self.demand_test_w = load(st.eval_dir_test + 'demand.bin')
+        self.demand_train_w = load(st.eval_dir + 'demand.bin')
+        self.supply_test_w = load(st.eval_dir_test + 'supply.bin')
+        self.supply_train_w = load(st.eval_dir + 'supply.bin')
+        self.gap_train_w = load(st.eval_dir + 'gap.bin')
+        self.gap_test_w = load(st.eval_dir_test + 'gap.bin')
         # self.pois = load(st.eval_dir+'pois.bin')
         self.pois = load(st.eval_dir + 'pois_simple.bin')
 
     def load_daily_data(self):
-        self.load_prediction_times()
         self.demand_train = load(st.eval_dir + 'demand_daywise.bin')
         self.demand_test = load(st.eval_dir_test + 'demand_daywise.bin')
 
@@ -112,11 +112,12 @@ class Learning_data_builder(object):
         self.weather_train = load(st.eval_dir + 'weather_daywise.bin')
         self.weather_test = load(st.eval_dir_test + 'weather_daywise_test.bin')
 
-        # self.pois = load(st.eval_dir_test + 'pois.bin')
-        self.pois = load(st.eval_dir_test + 'pois_simple.bin')
+        self.pois = load(st.eval_dir_test + 'pois.bin')
+        # self.pois = load(st.eval_dir_test + 'pois_simple.bin')
 
     def get_daily_test_data(self):
         self.load_daily_data()
+        # self.load_week_day_wise_data()
 
         samples_test = []
         gap_test_rslt = []
@@ -129,17 +130,30 @@ class Learning_data_builder(object):
                     self.empty_test_days.index(day)
                 except:
                     skip_day = False
-                if skip_day or day > 30:
+                if skip_day or day > st.n_train_days:
                     continue
 
-                samples_test.append(np.concatenate(([day, dtime_slt],
+                # week_day =
+
+                if dtime_slt-2 > 0: prev_gap2 = self.gap_test[day, :, dtime_slt-2].flatten()
+                elif day > 0:       prev_gap2 = self.gap_test[day-1, :, 142].flatten()
+                else:               prev_gap2 = np.zeros_like(self.gap_test[day, :, 0])
+
+                if dtime_slt-1 > 0: prev_gap1 = self.gap_test[day, :, dtime_slt-1].flatten()
+                elif day > 0:       prev_gap1 = self.gap_test[day-1, :, 143].flatten()
+                else:               prev_gap1 = np.zeros_like(self.gap_test[day, :, 0])
+
+                samples_test.append(np.concatenate(([day, dtime_slt, distr],
                                                     self.traffic_test[day, distr, dtime_slt, :].flatten(),
-                                                    self.pois[distr].flatten(),
+                                                    # self.pois[distr].flatten(),
                                                     self.dest_test[day, distr].flatten(),
                                                     self.start_test[day, distr].flatten(),
                                                     self.demand_test[day, distr, dtime_slt].flatten(),
                                                     self.supply_test[day, distr, dtime_slt].flatten(),
                                                     self.weather_test[day-1, :, dtime_slt].flatten()
+                                                    , prev_gap2
+                                                    , prev_gap1
+                                                    # , self.gap_train_w[week_day]
                                                     ), axis=0))
                 gap_test_rslt.append(self.gap_test[day, distr, dtime_slt])
 
@@ -159,17 +173,30 @@ class Learning_data_builder(object):
                         self.empty_train_days.index(day)
                     except:
                         skip_day = False
-                    if skip_day or day > 30:
+                    if skip_day or day > st.n_train_days:
                         continue
 
-                    samples_train.append(np.concatenate(([day, dtime_slt],
+                    # week_day =
+
+                    if dtime_slt-2 > 0:   prev_gap2 = self.gap_train[day, :, dtime_slt - 2].flatten()
+                    elif day > 0:         prev_gap2 = self.gap_train[day - 1, :, 142].flatten()
+                    else:                 prev_gap2 = np.zeros_like(self.gap_train[day, :, 0])
+
+                    if dtime_slt-1 > 0:   prev_gap1 = self.gap_train[day, :, dtime_slt - 1].flatten()
+                    elif day > 0:         prev_gap1 = self.gap_train[day - 1, :, 143].flatten()
+                    else:                 prev_gap1 = np.zeros_like(self.gap_train[day, :, 0])
+
+                    samples_train.append(np.concatenate(([day, dtime_slt, distr],
                                                          self.traffic_train[day, distr, dtime_slt, :].flatten(),
-                                                         self.pois[distr].flatten(),
+                                                         # self.pois[distr].flatten(),
                                                          self.dest_train[day, distr].flatten(),
                                                          self.start_train[day, distr].flatten(),
                                                          self.demand_train[day, distr, dtime_slt].flatten(),
                                                          self.supply_train[day, distr, dtime_slt].flatten(),
                                                          self.weather_train[day-1, :, dtime_slt].flatten()
+                                                         , prev_gap2
+                                                         , prev_gap1
+                                                         # , self.gap_train_w[week_day]
                                                      ), axis=0))
                     gap_train_rslt.append(self.gap_train[day, distr, dtime_slt])
 
@@ -184,17 +211,28 @@ class Learning_data_builder(object):
                     self.empty_test_days.index(day)
                 except:
                     skip_day = False
-                if skip_day or day > 30:
+                if skip_day or day > st.n_train_days:
                     continue
 
-                samples_test.append(np.concatenate(([day, dtime_slt],
+                if dtime_slt-2 > 0:   prev_gap2 = self.gap_test[day, :, dtime_slt - 2].flatten()
+                elif day > 0:         prev_gap2 = self.gap_test[day - 1, :, 142].flatten()
+                else:                 prev_gap2 = np.zeros_like(self.gap_test[day, :, 0])
+
+                if dtime_slt-1 > 0:   prev_gap1 = self.gap_test[day, :, dtime_slt - 1].flatten()
+                elif day > 0:         prev_gap1 = self.gap_test[day - 1, :, 143].flatten()
+                else:                 prev_gap1 = np.zeros_like(self.gap_test[day, :, 0])
+
+                samples_test.append(np.concatenate(([day, dtime_slt, distr],
                                                      self.traffic_test[day, distr, dtime_slt, :].flatten(),
-                                                     self.pois[distr].flatten(),
+                                                     # self.pois[distr].flatten(),
                                                      self.dest_test[day, distr].flatten(),
                                                      self.start_test[day, distr].flatten(),
                                                      self.demand_test[day, distr, dtime_slt].flatten(),
                                                      self.supply_test[day, distr, dtime_slt].flatten(),
                                                      self.weather_test[day-1, :, dtime_slt].flatten()
+                                                    , prev_gap2
+                                                    , prev_gap1
+                                                    # , self.gap_test_w[week_day]
                                                      ), axis=0))
                 gap_test_rslt.append(self.gap_test[day, distr, dtime_slt])
 

@@ -31,7 +31,7 @@ class Learning_data_builder(object):
         for p in prediction_date:
             self.prediction_times.append(p)
         self.prediction_times = self.prediction_times[st.n_csv_header_lines:]
-        self.pred_days = [x.split('-')[2] for x in self.prediction_times]
+        # self.pred_days = [x.split('-')[2] for x in self.prediction_times]
         self.pred_timeslots = [dict(zip(st.prediction_keys, x.split('-'))) for x in self.prediction_times]
         self.n_pred_tisl = len(self.pred_timeslots)
 
@@ -112,8 +112,8 @@ class Learning_data_builder(object):
         self.weather_train = load(st.eval_dir + 'weather_daywise.bin')
         self.weather_test = load(st.eval_dir_test + 'weather_daywise_test.bin')
 
-        self.pois = load(st.eval_dir_test + 'pois.bin')
-        # self.pois = load(st.eval_dir_test + 'pois_simple.bin')
+        # self.pois = load(st.eval_dir_test + 'pois.bin')
+        self.pois = load(st.eval_dir_test + 'pois_simple.bin')
 
     def get_daily_test_data(self):
         self.load_daily_data()
@@ -133,18 +133,18 @@ class Learning_data_builder(object):
                 if skip_day or day > st.n_train_days:
                     continue
 
-                # week_day =
+                # week_day = datetime.strptime('2016-01-' + str(day + 1).zfill(2), '%Y-%m-%d').weekday()
 
-                if dtime_slt-2 > 0: prev_gap2 = self.gap_test[day, :, dtime_slt-2].flatten()
-                elif day > 0:       prev_gap2 = self.gap_test[day-1, :, 142].flatten()
-                else:               prev_gap2 = np.zeros_like(self.gap_test[day, :, 0])
+                if dtime_slt-2 > 0: prev_gap2 = self.gap_test[day, distr, dtime_slt-2].flatten()
+                elif day > 0:       prev_gap2 = self.gap_test[day-1, distr, st.n_timeslots-2].flatten()
+                else:               prev_gap2 = np.zeros_like(self.gap_test[day, distr, 0]).flatten()
 
-                if dtime_slt-1 > 0: prev_gap1 = self.gap_test[day, :, dtime_slt-1].flatten()
-                elif day > 0:       prev_gap1 = self.gap_test[day-1, :, 143].flatten()
-                else:               prev_gap1 = np.zeros_like(self.gap_test[day, :, 0])
+                if dtime_slt-3 > 0: prev_gap1 = self.gap_test[day, distr, dtime_slt-3].flatten()
+                elif day > 0:       prev_gap1 = self.gap_test[day-1, distr, st.n_timeslots-3].flatten()
+                else:               prev_gap1 = np.zeros_like(self.gap_test[day, :, 0]).flatten()
 
                 samples_test.append(np.concatenate(([day, dtime_slt, distr],
-                                                    self.traffic_test[day, distr, dtime_slt, :].flatten(),
+                                                    self.traffic_test[day, :, dtime_slt, :].reshape((66 * 4)),
                                                     # self.pois[distr].flatten(),
                                                     self.dest_test[day, distr].flatten(),
                                                     self.start_test[day, distr].flatten(),
@@ -162,6 +162,7 @@ class Learning_data_builder(object):
     def build_daily_training_data(self):
         self.logger.info('... building training data: daily samples')
         self.load_daily_data()
+        # self.load_week_day_wise_data()
         samples_train = []
         gap_train_rslt = []
 
@@ -176,18 +177,18 @@ class Learning_data_builder(object):
                     if skip_day or day > st.n_train_days:
                         continue
 
-                    # week_day =
+                    # week_day = datetime.strptime('2016-01-'+str(day+1).zfill(2), '%Y-%m-%d').weekday()
 
-                    if dtime_slt-2 > 0:   prev_gap2 = self.gap_train[day, :, dtime_slt - 2].flatten()
-                    elif day > 0:         prev_gap2 = self.gap_train[day - 1, :, 142].flatten()
-                    else:                 prev_gap2 = np.zeros_like(self.gap_train[day, :, 0])
+                    if dtime_slt-2 > 0:   prev_gap2 = self.gap_train[day, distr, dtime_slt - 2].flatten()
+                    elif day > 0:         prev_gap2 = self.gap_train[day-1, distr, st.n_timeslots-2].flatten()
+                    else:                 prev_gap2 = np.zeros_like(self.gap_train[day, distr, 0]).flatten()
 
-                    if dtime_slt-1 > 0:   prev_gap1 = self.gap_train[day, :, dtime_slt - 1].flatten()
-                    elif day > 0:         prev_gap1 = self.gap_train[day - 1, :, 143].flatten()
-                    else:                 prev_gap1 = np.zeros_like(self.gap_train[day, :, 0])
+                    if dtime_slt-3 > 0:   prev_gap1 = self.gap_train[day, distr, dtime_slt -3].flatten()
+                    elif day > 0:         prev_gap1 = self.gap_train[day-1, distr, st.n_timeslots-3].flatten()
+                    else:                 prev_gap1 = np.zeros_like(self.gap_train[day, distr, 0]).flatten()
 
                     samples_train.append(np.concatenate(([day, dtime_slt, distr],
-                                                         self.traffic_train[day, distr, dtime_slt, :].flatten(),
+                                                         self.traffic_train[day, :, dtime_slt, :].reshape((66 * 4)),
                                                          # self.pois[distr].flatten(),
                                                          self.dest_train[day, distr].flatten(),
                                                          self.start_train[day, distr].flatten(),
@@ -200,41 +201,44 @@ class Learning_data_builder(object):
                                                      ), axis=0))
                     gap_train_rslt.append(self.gap_train[day, distr, dtime_slt])
 
-        samples_test = []
-        gap_test_rslt = []
-        for distr in range(st.n_districts):
-            for pred_idx, pred_dict in enumerate(self.pred_timeslots):
-                day = int(pred_dict.get('day'))
-                dtime_slt = int(pred_dict.get('timeslot'))
-                skip_day = True
-                try:
-                    self.empty_test_days.index(day)
-                except:
-                    skip_day = False
-                if skip_day or day > st.n_train_days:
-                    continue
-
-                if dtime_slt-2 > 0:   prev_gap2 = self.gap_test[day, :, dtime_slt - 2].flatten()
-                elif day > 0:         prev_gap2 = self.gap_test[day - 1, :, 142].flatten()
-                else:                 prev_gap2 = np.zeros_like(self.gap_test[day, :, 0])
-
-                if dtime_slt-1 > 0:   prev_gap1 = self.gap_test[day, :, dtime_slt - 1].flatten()
-                elif day > 0:         prev_gap1 = self.gap_test[day - 1, :, 143].flatten()
-                else:                 prev_gap1 = np.zeros_like(self.gap_test[day, :, 0])
-
-                samples_test.append(np.concatenate(([day, dtime_slt, distr],
-                                                     self.traffic_test[day, distr, dtime_slt, :].flatten(),
-                                                     # self.pois[distr].flatten(),
-                                                     self.dest_test[day, distr].flatten(),
-                                                     self.start_test[day, distr].flatten(),
-                                                     self.demand_test[day, distr, dtime_slt].flatten(),
-                                                     self.supply_test[day, distr, dtime_slt].flatten(),
-                                                     self.weather_test[day-1, :, dtime_slt].flatten()
-                                                    , prev_gap2
-                                                    , prev_gap1
-                                                    # , self.gap_test_w[week_day]
-                                                     ), axis=0))
-                gap_test_rslt.append(self.gap_test[day, distr, dtime_slt])
+        # samples_test = []
+        # gap_test_rslt = []
+        # for distr in range(st.n_districts):
+        #     for pred_idx, pred_dict in enumerate(self.pred_timeslots):
+        #         day = int(pred_dict.get('day'))
+        #         dtime_slt = int(pred_dict.get('timeslot'))
+        #         skip_day = True
+        #         try:
+        #             self.empty_test_days.index(day)
+        #         except:
+        #             skip_day = False
+        #         if skip_day or day > st.n_train_days:
+        #             continue
+        #
+        #         # week_day = datetime.strptime('2016-01-' + str(day + 1).zfill(2), '%Y-%m-%d').weekday()
+        #
+        #         if dtime_slt-2 > 0:   prev_gap2 = self.gap_test[day, :, dtime_slt - 2].flatten()
+        #         elif day > 0:         prev_gap2 = self.gap_test[day - 1, :, st.n_timeslots-2].flatten()
+        #         else:                 prev_gap2 = np.zeros_like(self.gap_test[day, :, 0])
+        #
+        #         if dtime_slt-3 > 0:   prev_gap1 = self.gap_test[day, :, dtime_slt - 3].flatten()
+        #         elif day > 0:         prev_gap1 = self.gap_test[day - 1, :, st.n_timeslots-3].flatten()
+        #         else:                 prev_gap1 = np.zeros_like(self.gap_test[day, :, 0])
+        #
+        #         samples_test.append(np.concatenate(([day, dtime_slt, distr],
+        #                                              self.traffic_test[day, distr, dtime_slt, :].flatten(),
+        #                                              self.pois[distr].flatten(),
+        #                                              self.dest_test[day, distr].flatten(),
+        #                                              self.start_test[day, distr].flatten(),
+        #                                              self.demand_test[day, distr, dtime_slt].flatten(),
+        #                                              self.supply_test[day, distr, dtime_slt].flatten(),
+        #                                              self.weather_test[day-1, :, dtime_slt].flatten()
+        #                                             , prev_gap2
+        #                                             , prev_gap1
+        #                                             # , self.gap_test_w[week_day]
+        #                                              ), axis=0))
+        #         gap_test_rslt.append(self.gap_test[day, distr, dtime_slt])
+        samples_test, gap_test_rslt, _, _ = self.get_daily_test_data()
 
         n_train = len(samples_train)
         # self.specify_standardization_parameter(samples_train)

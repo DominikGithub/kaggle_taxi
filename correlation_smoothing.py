@@ -7,29 +7,25 @@ from utils_image import *
 labels = ['weather', 'temp', 'pm25']
 
 def poi_correlation():
-    weekday = 0
-
     # pois = load(st.eval_dir + 'pois.bin')   #66x30
     # poi0 = np.repeat(pois[:,0], 144, axis=0).reshape((66, 144))
     # print poi0.shape
 
-    demand = load(st.eval_dir + 'demand.bin')[:,:,:].reshape((66, 7*144))   #7x66x144
-    print demand.shape
+    gap_daywise = load(st.eval_dir + 'gap_daywise.bin')[:,:,:].reshape((66, 22*144))   #22x66x144
+    print gap_daywise.shape
 
-    supply = load(st.eval_dir + 'supply.bin')[:, :, :].reshape((66, 7*144))  # 7x66x144
-    print supply.shape
+    supply_daywise = load(st.eval_dir + 'supply_daywise.bin')[:, :, :].reshape((66, 22*144))  # 22x66x144
+    print supply_daywise.shape
 
-
-    traffic_per_time = np.mean(load(st.eval_dir + 'traffic.bin'), axis=3)[:,:].reshape((66, 7*144))  # 7x66x144x4
+    traffic_per_time = np.mean(load(st.eval_dir + 'traffic_daywise.bin'), axis=3)[:,:].reshape((66, 22*144))  #22x66x144x4
     print traffic_per_time.shape
 
-    pearR = np.corrcoef(demand, supply)
+    pearR = np.corrcoef(gap_daywise, traffic_per_time)
     # pearR = np.corrcoef(demand, poi0)
 
     # traf = load(st.eval_dir + 'traffic.bin')
     # print traf[0,:,:,0].shape
     # pearR = np.corrcoef(traf[0,:,:,0], traf[0,:,:,0])
-
 
     # pearR = np.corrcoef(traf[0,:,0,0], pois[:,0])
     print pearR
@@ -66,6 +62,7 @@ def smooth_visualize_weather_train():
     n_days = 31
 
     fig, axarr = plt.subplots(n_days, 3, figsize=(20, 30))
+    plt.ioff()
     smoothed = np.ndarray((n_days, 3, 144))
     for day in range(n_days):
         for objective in range(0, 3):
@@ -99,6 +96,7 @@ def smooth_visualize_weather_test():
     n_days = 31
 
     fig, axarr = plt.subplots(n_days, 3, figsize=(20, 30))
+    plt.ioff()
     smoothed = np.ndarray((n_days, 3, 144))
     for day in range(n_days):
         for objective in range(0, 3):
@@ -120,6 +118,7 @@ def smooth_visualize_weather_test():
     plt.close()
 
 # if __name__ == "__main__":
+#     poi_correlation()
     # name = 'weather.bin'
     # weather_correlation(st.eval_dir+name)
     # smooth_weather_train()

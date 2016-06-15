@@ -4,15 +4,23 @@ import os
 
 fileDir = os.path.dirname(os.path.realpath('__file__'))
 
-data_dir_test = 'data_test/'
+# data_dir_test = 'data_test/'
+data_dir_test2 = 'data_test2/'
+data_dir_test = data_dir_test2
 
 cut_off_test = 5
-data_dir = 'data_train/'#data_dir_test
+data_dir2 = 'data_train2/'
+data_dir = data_dir2   #data_dir_test2
+# data_dir = 'data_train/'   #data_dir_test
 
-eval_dir = data_dir+'evaluation/'
-eval_dir_test = data_dir_test+'evaluation/'
+# eval_dir = data_dir+'evaluation/'
+eval_dir2 = data_dir2+'evaluation/'
+eval_dir = eval_dir2
+# eval_dir_test = data_dir_test+'evaluation/'
+eval_dir_test2 = data_dir_test2+'evaluation/'
+eval_dir_test = eval_dir_test2
 
-# n_train_days = 21   #5
+n_train_days = 31   #5
 n_districts = 66
 n_timeslots = 144
 

@@ -121,11 +121,11 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
     valid_set_x, valid_set_y = data_validate
     test_set_x, test_set_y = data_test
 
-    batch_size = 5000
+    batch_size = 10000
     n_in = train_set_x.shape[1]
-    n_out = 200  #n_in    #batch_size
-    n_hidden = 100
-    n_epochs = 20
+    n_out = 1 #n_in    #batch_size
+    n_hidden = 350
+    n_epochs = 10
     opt_name = 'RmsProp'    #'Adadelta'
     active_func_name = 'tanh'   # 'Rectified linear unit'
     n_train_batches = train_set_x.shape[0] // batch_size
@@ -186,18 +186,12 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
 
     try:
         save_time_delta = toUTCtimestamp(datetime.utcnow())
-        latest, classifier = load_model(classifier)
-        print '... load latest model: %s' % latest
-        logging.info('... load latest model: %s' % latest)
+        # latest, classifier = load_model(classifier)
+        # print '... load latest model: %s' % latest
+        # logging.info('... load latest model: %s' % latest)
     except ImportWarning as ex:
         print ex.message
         logging.info(ex.message)
-
-
-    # latest, classifier = load_model(classifier)
-    # plot_receptive_fields(classifier, latest)
-    # return
-
 
     def d_loss_wrt_pars(parameters, inputs, targets):
         g_W_h, g_b_h, g_W_h2, g_b_h2, g_W_l, g_b_l = gradients(inputs, targets)
@@ -205,11 +199,11 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
         g_W_h, g_b_h, g_W_l, g_b_l = gradients(inputs, targets)
         return np.concatenate([g_W_h.flatten(), g_b_h, g_W_l.flatten(), g_b_l])
 
-    mean_abs_percentage_error = theano.function(
-        inputs=[x,y],
-        outputs=classifier.mean_abs_percentage_error(x, y),
-        allow_input_downcast=True
-    )
+    # mean_abs_percentage_error = theano.function(
+    #     inputs=[x,y],
+    #     outputs=classifier.mean_abs_percentage_error(x, y),
+    #     allow_input_downcast=True
+    # )
 
     zero_one_loss = theano.function(
         inputs = [x, y],
@@ -239,7 +233,7 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
 
     print('... using linear regression optimizer: %s' % opt_name)
     if opt_name == 'RmsProp':
-        step = 1e-4
+        step = 1e-4# * 0.9**2000
         dec = 0.9
         opt = climin.RmsProp(wrt_flat, d_loss_wrt_pars, step_rate=step, decay=dec, args=args)
         logging.info('RmsProp step rate: %s, decay %s' % (step, dec))
@@ -304,7 +298,6 @@ def mlp_train(logging, data_train, data_validate, data_test, add_L1_L2_regulariz
             step_rate = info.get('step_rate')
             break
 
-    print 'finished at step_rate: %f' % step_rate
     finished_at = datetime.now()
     print('Finished at: %s' % finished_at)
     logging.info('Finished at: %s' % finished_at)

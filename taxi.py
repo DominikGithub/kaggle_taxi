@@ -2,14 +2,17 @@
 
 from sys import stdout
 import logging
+import numpy as np
 from random import randint
 from LogisticRegression import *
 from learning_data_builder import Learning_data_builder
 from mlp import mlp_train
+from test_RNN import test_RNN
 from data_container import IncMap, create_distr_Map
 from utils_file import *
 from utils_image import *
 from utils_date import *
+import pandas as pd
 from correlation_smoothing import smooth_visualize_weather_train, smooth_visualize_weather_test, interpolate_traffic
 from preprocessor import Preprocessor
 
@@ -159,6 +162,7 @@ def preprocessing(date='*', interpolate_missing=False):
     preprocess_orders(date)
 
 def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl, save_timestmp):
+    data += abs(np.min(data))
     pred_formatted = np.asarray([float('%.2f' % x) for x in data.tolist()]).reshape((st.n_districts, n_pred_tisl))
     save_predictions(prediction_times, pred_formatted, save_timestmp)
     visualize_prediction((pred_formatted), 'prediction', n_pred_tisl, save_timestmp)
@@ -166,18 +170,17 @@ def prediction_postprocessing(data, gap, prediction_times, n_pred_tisl, save_tim
     print 'predictions: %s' % pred_formatted
     print 'gap:         %s' % gap.flatten()
 
-    # timeslots = [x.split('-')[3] for x in prediction_times]
-    # gap_subset = np.ndarray((7, st.n_districts, n_pred_tisl))
-    # for tsl_idx, tslot in enumerate([int(t) for t in timeslots]):
-    #     week_day = datetime.strptime(prediction_times[tsl_idx][:10], '%Y-%m-%d').weekday()
-    #     gap_subset[week_day, :,tsl_idx] = gap[week_day,:,tslot]
-    #
-    # gap_subset = np.mean(gap_subset, axis=0)
-    # gap_inv = np.linalg.inv(np.dot(gap_subset.transpose(), gap_subset))
-    # MAPE = np.sum(np.sum( np.abs(np.dot((gap_subset-pred_shaped), gap_inv)) )/n_pred_tisl )/st.n_districts
+    timeslots = [x.split('-')[3] for x in prediction_times]
+    gap_subset = np.ndarray((7, st.n_districts, n_pred_tisl))
+    for tsl_idx, tslot in enumerate([int(t) for t in timeslots]):
+        week_day = datetime.strptime(prediction_times[tsl_idx][:10], '%Y-%m-%d').weekday()
+        gap_subset[week_day, :,tsl_idx] = gap[week_day,:,tslot]
 
-    # print 'MAPE: %s' % MAPE
-    # logging.warn('MAPE: %s' % MAPE)
+    gap_subset = np.mean(gap_subset, axis=0)
+    gap_inv = np.linalg.inv(np.dot(gap_subset.transpose(), gap_subset))
+    MAPE = np.sum(np.sum( np.abs(np.dot((gap_subset-pred_shaped), gap_inv)) )/n_pred_tisl )/st.n_districts
+    print 'MAPE: %s' % MAPE
+    logging.warn('MAPE: %s' % MAPE)
 
     logging.info('saved prediction to file: %s_%s.csv' % (st.eval_dir_test, save_timestmp))
     logging.info('saved prediction to file: %sprediction_%s.png' % (st.eval_dir_test, save_timestmp))
@@ -219,16 +222,36 @@ def train_nn(interpolate_missing=False):
         logging.info('shuffeling: %i of %i' % (shuffel, st.n_times_shuffel))
 
         sample_train, gap_train = shuffel_data(sample_train, gap_train)
-        tr = [np.asarray(sample_train[:-valid_size]), np.asarray(gap_train[:-valid_size])]
-        print 'train: %s  %s'  % (tr[0].shape, tr[1].shape)
-        va = [np.asarray(sample_train[-valid_size:]), np.asarray(gap_train[-valid_size:])]
+        tr = [np.asarray(sample_train[valid_size:]), np.asarray(gap_train[valid_size:])]
+        va = [np.asarray(sample_train[:valid_size]), np.asarray(gap_train[:valid_size])]
+        # tr = [np.asarray(sample_train[:-valid_size]), np.asarray(gap_train[:-valid_size])]
+        # va = [np.asarray(sample_train[-valid_size:]), np.asarray(gap_train[-valid_size:])]
         te = [np.asarray(sample_test), np.asarray(gap_test)]
+        print 'train: %s  %s' % (tr[0].shape, tr[1].shape)
+
 
         classifier = mlp_train(logging, tr, va, te, add_L1_L2_regularizer=True)
+        # train_set_x, train_set_y = tr
+        # classifier = test_RNN(train_set_x, train_set_y, nh=300, nl=3, n_in=train_set_x.shape[1])
+
         save_model(logging, classifier)
 
     assert classifier is not None, 'Classifier was not initialized while training'
     return classifier
+
+def MAPE(actuals, predictions):
+    """ Returns the Mean Absolute Percentage Error (MAPE) for the predictions of the Supply-Demand gap.
+    """
+    if len(actuals) != len(predictions):
+        return "Error! Actuals and predictions are of different lengths."
+    result = 0.0
+    df = pd.DataFrame()
+    df['actuals'] = actuals
+    df['predictions'] = predictions
+    df = df[df['actuals'] != 0]
+    df['error'] = abs((df['actuals'] - df['predictions']) / df['actuals'])
+    result = df['error'].sum() / df['error'].size
+    return result
 
 def predict_nn(classifier):
     print '... prediction'
@@ -249,11 +272,14 @@ def predict_nn(classifier):
         prediction *= mape_factor
         logging.info('mape factor: %i' % mape_factor)
 
+    # print 'pMape: %s' % MAPE(prediction, gap_test)
+    # logging.info('pMape: %s' % MAPE(prediction, gap_test))
+
     save_timestmp = toUTCtimestamp(datetime.utcnow())
     dot_idx = str(save_timestmp).index('.')
     save_timestmp = str(save_timestmp)[:dot_idx]
     prediction_postprocessing(prediction, np.asarray(gap_test), prediction_times, n_pred_tisl, save_timestmp)
-    diff_prediction_gap(gap_test, prediction, n_pred_tisl, save_timestmp)
+    # diff_prediction_gap(gap_test, prediction, n_pred_tisl, save_timestmp)
     plot_receptive_fields(classifier, save_timestmp)
 
 def diff_prediction_gap(gap, prediction, timeslots, timestmp):

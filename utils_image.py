@@ -33,7 +33,7 @@ def visualize(data, title, normalize=False):
 
     if normalize:
         # data = norm(data)
-        print 'sci-learn scaling used in utils_image.visualization....'
+        print 'scikit-learn scaling used in utils_image.visualization....'
         data = preprocessing.scale(data)
 
     plt.imshow(data.transpose(), interpolation='none', cmap=st.colormap, origin='lower', extent=[0, st.n_districts, 0, 24])
@@ -108,7 +108,7 @@ def visualize_traffic(data, title, normalize=False):
             idx += 1
     fig.suptitle(title, fontsize=20)
     plt.tight_layout()
-    plt.savefig(st.eval_dir+title+'.png')
+    plt.savefig(st.eval_dir_test+title+'.png')
     plt.close()
 
 def visualize_orders(data, title, normalize=False):
@@ -206,13 +206,13 @@ def plot_receptive_fields(classifier, timestamp):
     print '... plotting receptive fields'
     h1W = classifier.hiddenLayer1.W.get_value(borrow=True)
     n_hidden = h1W.shape[1]
-    n_rows = 2
-    n_cols = h1W.shape[1] // 2
+    n_rows = 1
+    n_cols = h1W.shape[1] #// 4
     plt.ioff()
     ax1 = plt.subplot(1, n_hidden, 1)
     for neuron in range(n_hidden):
         ax2 = plt.subplot(n_rows, n_cols, neuron+1)
-        ax2.imshow(h1W[:, neuron].reshape((h1W.shape[0], 1)), cmap='Greys_r')
+        ax2.imshow(h1W[:, neuron].reshape((h1W.shape[0], 1)), cmap='Greys_r', interpolation='none')
         plt.axis('off')
     # plt.suptitle('MLP, %i hidden neurons, activation function: %s, optimizer: %s, test error: %.2f, running %i epochs' %
     #              (n_hidden, h_active_funcs[ac_func_id], rslt_list[ac_func_id].optimizer,
